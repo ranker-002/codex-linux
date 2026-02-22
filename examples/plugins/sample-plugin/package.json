@@ -1,0 +1,41 @@
+{
+  "name": "codex-sample-plugin",
+  "version": "1.0.0",
+  "description": "A sample plugin for Codex Linux demonstrating the plugin API",
+  "main": "dist/index.js",
+  "author": "Codex Linux Team",
+  "license": "MIT",
+  "engines": {
+    "codex": "^1.0.0"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "sample.hello",
+        "title": "Say Hello",
+        "category": "Sample"
+      },
+      {
+        "command": "sample.showInfo",
+        "title": "Show Plugin Info",
+        "category": "Sample"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "sample.hello",
+          "group": "sample"
+        },
+        {
+          "command": "sample.showInfo",
+          "group": "sample"
+        }
+      ]
+    }
+  },
+  "activationEvents": [
+    "onCommand:sample.hello",
+    "onCommand:sample.showInfo"
+  ]
+}

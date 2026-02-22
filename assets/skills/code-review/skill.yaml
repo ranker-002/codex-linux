@@ -1,0 +1,15 @@
+id: code-review-skill
+name: Code Review
+version: "1.0.0"
+author: Codex Linux Team
+description: Comprehensive code review guidelines for maintaining code quality
+entryPoint: instructions.md
+tags:
+  - review
+  - quality
+  - best-practices
+parameters: []
+dependencies: []
+permissions:
+  - read-code
+  - write-comments

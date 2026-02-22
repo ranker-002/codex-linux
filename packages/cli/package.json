@@ -1,0 +1,29 @@
+{
+  "name": "@codex-linux/cli",
+  "version": "1.0.0",
+  "description": "CLI tool for Codex Linux",
+  "main": "dist/index.js",
+  "bin": {
+    "codex": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "axios": "^1.6.2",
+    "chalk": "^4.1.2",
+    "inquirer": "^9.2.12",
+    "ora": "^5.4.1",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^20.10.6",
+    "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

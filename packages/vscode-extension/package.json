@@ -1,0 +1,167 @@
+{
+  "name": "codex-linux",
+  "displayName": "Codex Linux",
+  "description": "VS Code extension for Codex Linux - Multi-agent AI coding",
+  "version": "1.0.0",
+  "publisher": "codex-linux",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "ai",
+    "codex",
+    "chatgpt",
+    "claude",
+    "code generation"
+  ],
+  "activationEvents": [
+    "onCommand:codex.start",
+    "onView:codex.agents"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codex.start",
+        "title": "Start Codex",
+        "category": "Codex"
+      },
+      {
+        "command": "codex.chat",
+        "title": "Chat with Agent",
+        "category": "Codex"
+      },
+      {
+        "command": "codex.explain",
+        "title": "Explain Code",
+        "category": "Codex"
+      },
+      {
+        "command": "codex.refactor",
+        "title": "Refactor Code",
+        "category": "Codex"
+      },
+      {
+        "command": "codex.test",
+        "title": "Generate Tests",
+        "category": "Codex"
+      },
+      {
+        "command": "codex.createAgent",
+        "title": "Create Agent",
+        "category": "Codex"
+      },
+      {
+        "command": "codex.refreshAgents",
+        "title": "Refresh Agents",
+        "category": "Codex",
+        "icon": "$(refresh)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "codex.agents",
+          "name": "Codex Agents",
+          "when": "codex.enabled"
+        }
+      ]
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "codex.start"
+        },
+        {
+          "command": "codex.chat"
+        },
+        {
+          "command": "codex.createAgent"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "codex.explain",
+          "group": "codex@1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "codex.refactor",
+          "group": "codex@2",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "codex.test",
+          "group": "codex@3"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "codex.refreshAgents",
+          "when": "view == codex.agents",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codex Linux",
+      "properties": {
+        "codex.api.host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Codex API host"
+        },
+        "codex.api.port": {
+          "type": "number",
+          "default": 3001,
+          "description": "Codex API port"
+        },
+        "codex.api.key": {
+          "type": "string",
+          "default": "",
+          "description": "Codex API key"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "codex.chat",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      },
+      {
+        "command": "codex.explain",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-electron": "^2.3.8",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "ws": "^8.16.0"
+  }
+}

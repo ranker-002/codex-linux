@@ -1,0 +1,15 @@
+id: refactoring-skill
+name: Refactoring Assistant
+version: "1.0.0"
+author: Codex Linux Team
+description: Expert guidance for code refactoring and improving code quality
+entryPoint: instructions.md
+tags:
+  - refactoring
+  - optimization
+  - clean-code
+parameters: []
+dependencies: []
+permissions:
+  - read-code
+  - write-code

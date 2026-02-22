@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  codex:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: codexlinux/app:latest
+    container_name: codex-linux
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - codex-data:/home/codex/.config/codex
+      - type: bind
+        source: ${HOST_PROJECT_PATH:-./projects}
+        target: /projects
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+    networks:
+      - codex-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: codex-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - codex-network
+    command: redis-server --appendonly yes
+
+  # Optional: PostgreSQL for team features
+  postgres:
+    image: postgres:15-alpine
+    container_name: codex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codex
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-codex123}
+      POSTGRES_DB: codex
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - codex-network
+    ports:
+      - "5432:5432"
+
+volumes:
+  codex-data:
+  redis-data:
+  postgres-data:
+
+networks:
+  codex-network:
+    driver: bridge

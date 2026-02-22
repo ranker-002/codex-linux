@@ -1,0 +1,42 @@
+{
+  "name": "Codex Linux",
+  "short_name": "Codex",
+  "description": "Multi-agent AI coding command center for Linux",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#171717",
+  "theme_color": "#404040",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["development", "productivity", "tools"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "New Agent",
+      "short_name": "Agent",
+      "description": "Create a new AI agent",
+      "url": "/?action=new-agent"
+    },
+    {
+      "name": "Settings",
+      "short_name": "Settings",
+      "description": "Open settings",
+      "url": "/settings"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

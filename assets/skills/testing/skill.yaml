@@ -1,0 +1,15 @@
+id: testing-skill
+name: Testing Expert
+version: "1.0.0"
+author: Codex Linux Team
+description: Comprehensive testing strategies and best practices
+entryPoint: instructions.md
+tags:
+  - testing
+  - tdd
+  - quality-assurance
+parameters: []
+dependencies: []
+permissions:
+  - read-code
+  - write-tests
