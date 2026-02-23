@@ -713,3 +713,86 @@ export interface HookExecution {
   output?: string;
   error?: string;
 }
+
+// GitHub Actions / CI-CD Types
+export interface CICDConfig {
+  provider: 'github' | 'gitlab' | 'custom';
+  enabled: boolean;
+  workflowPath?: string;
+  triggers?: string[];
+}
+
+export interface WorkflowRun {
+  id: string;
+  workflowId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  conclusion?: 'success' | 'failure' | 'cancelled';
+  logs?: string;
+  startedAt: Date;
+  completedAt?: Date;
+  url?: string;
+}
+
+export interface CIAction {
+  type: 'run_workflow' | 'cancel_run' | 'get_logs' | 'get_status';
+  workflowId?: string;
+  runId?: string;
+}
+
+// Context Optimization Types
+export interface ContextCompactionConfig {
+  enabled: boolean;
+  threshold: number; // tokens
+  strategy: 'summarize' | 'prune' | 'hybrid';
+}
+
+export interface PromptCacheConfig {
+  enabled: boolean;
+  ttl: number; // seconds
+  maxSize: number; // entries
+}
+
+export interface CompactionResult {
+  originalTokens: number;
+  compactedTokens: number;
+  removedMessages: number;
+  summary?: string;
+}
+
+// Enterprise Types
+export interface SSOConfig {
+  provider: 'okta' | 'azure-ad' | 'google' | 'custom';
+  enabled: boolean;
+  metadataUrl?: string;
+  clientId?: string;
+}
+
+export interface RBACRole {
+  id: string;
+  name: string;
+  permissions: string[];
+  description?: string;
+}
+
+export interface RBACUser {
+  id: string;
+  email: string;
+  roles: string[];
+  lastLogin?: Date;
+}
+
+// Connector Types
+export interface ConnectorConfig {
+  id: string;
+  type: 'jira' | 'notion' | 'sentry' | 'linear' | 'slack';
+  enabled: boolean;
+  config: Record<string, any>;
+}
+
+export interface ConnectorCredentials {
+  connectorId: string;
+  apiKey?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: Date;
+}
