@@ -13,7 +13,10 @@ import {
   AlertCircle,
   Loader2,
   GitBranch,
-  Circle
+  Circle,
+  Pencil,
+  X,
+  Check
 } from 'lucide-react';
 
 export type SessionStatus = 'active' | 'archived' | 'running';
@@ -41,6 +44,7 @@ interface SessionSidebarProps {
   onSessionNew: () => void;
   onSessionArchive?: (sessionId: string) => void;
   onSessionDelete?: (sessionId: string) => void;
+  onSessionRename?: (sessionId: string, newName: string) => void;
 }
 
 function cn(...inputs: (string | undefined | null | boolean)[]): string {
@@ -53,11 +57,14 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
   onSessionSelect,
   onSessionNew,
   onSessionArchive,
-  onSessionDelete
+  onSessionDelete,
+  onSessionRename
 }) => {
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [envFilter, setEnvFilter] = useState<'all' | 'local' | 'cloud' | 'ssh'>('all');
   const [contextMenu, setContextMenu] = useState<string | null>(null);
+  const [renamingSession, setRenamingSession] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
 
   const filteredSessions = sessions.filter(session => {
     if (filter === 'active' && session.status !== 'active') return false;
@@ -215,10 +222,53 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">
-                        {session.name}
-                      </span>
-                      {getEnvIcon(session.environment)}
+                      {renamingSession === session.id ? (
+                        <div className="flex items-center gap-1 flex-1">
+                          <input
+                            type="text"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                onSessionRename?.(session.id, newName);
+                                setRenamingSession(null);
+                              }
+                              if (e.key === 'Escape') {
+                                setRenamingSession(null);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1 px-2 py-0.5 text-sm bg-background border border-input rounded"
+                            autoFocus
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSessionRename?.(session.id, newName);
+                              setRenamingSession(null);
+                            }}
+                            className="p-1 hover:bg-muted rounded"
+                          >
+                            <Check className="w-3 h-3 text-green-500" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenamingSession(null);
+                            }}
+                            className="p-1 hover:bg-muted rounded"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="font-medium text-sm truncate">
+                            {session.name}
+                          </span>
+                          {getEnvIcon(session.environment)}
+                        </>
+                      )}
                     </div>
                     
                     <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
@@ -283,6 +333,20 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
                       >
                         <XCircle className="w-4 h-4" />
                         Delete
+                      </button>
+                    )}
+                    {onSessionRename && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRenamingSession(session.id);
+                          setNewName(session.name);
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Rename
                       </button>
                     )}
                   </div>
