@@ -104,6 +104,83 @@ export class RemoteSessionManager extends EventEmitter {
     return Array.from(this.sessions.values());
   }
 
+  async addRepository(
+    sessionId: string,
+    repo: { owner: string; repo: string; branch?: string }
+  ): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    if (!session.repositories) {
+      session.repositories = [];
+    }
+
+    const existingIndex = session.repositories.findIndex(
+      r => r.owner === repo.owner && r.repo === repo.repo
+    );
+
+    if (existingIndex >= 0) {
+      session.repositories[existingIndex] = repo;
+    } else {
+      session.repositories.push(repo);
+    }
+
+    try {
+      await fetch(`${this.baseUrl}/remote_sessions/${sessionId}/repositories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({ repositories: session.repositories })
+      });
+
+      this.emit('session:repository-added', { sessionId, repo });
+      log.info(`Added repository ${repo.owner}/${repo.repo} to session ${sessionId}`);
+    } catch (error) {
+      log.error(`Failed to add repository to session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  async removeRepository(sessionId: string, repoPath: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const [owner, repo] = repoPath.split('/');
+    session.repositories = session.repositories?.filter(
+      r => !(r.owner === owner && r.repo === repo)
+    ) || [];
+
+    try {
+      await fetch(`${this.baseUrl}/remote_sessions/${sessionId}/repositories`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({ repositories: session.repositories })
+      });
+
+      this.emit('session:repository-removed', { sessionId, repoPath });
+      log.info(`Removed repository ${repoPath} from session ${sessionId}`);
+    } catch (error) {
+      log.error(`Failed to remove repository from session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  async getRepositories(sessionId: string): Promise<RemoteSessionConfig['repositories']> {
+    const session = this.sessions.get(sessionId);
+    return session?.repositories || [];
+  }
+
   async deleteSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) {
