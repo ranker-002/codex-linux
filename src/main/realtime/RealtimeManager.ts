@@ -1,12 +1,26 @@
 import { EventEmitter } from 'events';
 import log from 'electron-log';
-import { RealtimeConfig, SpeechRecognitionResult, SpeechSynthesisOptions } from '../../shared/types';
+import { RealtimeConfig } from '../../shared/types';
+
+export interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+  isFinal: boolean;
+  timestamp: Date;
+}
+
+export interface SpeechSynthesisOptions {
+  text: string;
+  voice?: string;
+  rate?: number;
+  pitch?: number;
+  volume?: number;
+}
 
 export class RealtimeManager extends EventEmitter {
   private config: RealtimeConfig;
   private isListening = false;
-  private recognition: any = null;
-  private audioContext: AudioContext | null = null;
+  private isSpeaking = false;
 
   constructor() {
     super();
@@ -41,75 +55,18 @@ export class RealtimeManager extends EventEmitter {
     return { ...this.config };
   }
 
-  // Speech-to-Text (STT) - Browser Web Speech API
+  // Speech-to-Text - handled by renderer via IPC
   async startListening(): Promise<void> {
     if (this.isListening) return;
-
-    try {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
-      if (!SpeechRecognition) {
-        throw new Error('Speech recognition not supported in this browser');
-      }
-
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      this.recognition.lang = this.config.language || 'en-US';
-
-      this.recognition.onresult = (event: any) => {
-        const results = event.results;
-        for (let i = event.resultIndex; i < results.length; i++) {
-          const result = results[i];
-          if (result.isFinal) {
-            const speechResult: SpeechRecognitionResult = {
-              transcript: result[0].transcript,
-              confidence: result[0].confidence,
-              isFinal: true,
-              timestamp: new Date(),
-            };
-            this.emit('speech:final', speechResult);
-          } else {
-            const interimResult: SpeechRecognitionResult = {
-              transcript: result[0].transcript,
-              confidence: result[0].confidence,
-              isFinal: false,
-              timestamp: new Date(),
-            };
-            this.emit('speech:interim', interimResult);
-          }
-        }
-      };
-
-      this.recognition.onerror = (event: any) => {
-        log.error('Speech recognition error:', event.error);
-        this.emit('speech:error', { error: event.error });
-      };
-
-      this.recognition.onend = () => {
-        if (this.isListening) {
-          this.recognition.start();
-        }
-      };
-
-      this.recognition.start();
-      this.isListening = true;
-      this.emit('listening:started');
-
-      log.info('Speech recognition started');
-    } catch (error) {
-      log.error('Failed to start speech recognition:', error);
-      throw error;
-    }
+    this.isListening = true;
+    this.emit('listening:started');
+    log.info('Speech recognition started (renderer handling)');
   }
 
   stopListening(): void {
-    if (!this.isListening || !this.recognition) return;
-
-    this.recognition.stop();
+    if (!this.isListening) return;
     this.isListening = false;
     this.emit('listening:stopped');
-
     log.info('Speech recognition stopped');
   }
 
@@ -117,76 +74,49 @@ export class RealtimeManager extends EventEmitter {
     return this.isListening;
   }
 
-  // Text-to-Speech (TTS)
-  async loadVoices(): Promise<SpeechSynthesisVoice[]> {
-    return new Promise((resolve) => {
-      if ('speechSynthesis' in window) {
-        const loadVoices = () => {
-          const voices = window.speechSynthesis.getVoices();
-          resolve(voices);
-        };
-
-        window.speechSynthesis.onvoiceschanged = loadVoices;
-        loadVoices();
-        setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1000);
-      } else {
-        resolve([]);
-      }
-    });
+  // Speech recognition results from renderer
+  handleSpeechResult(result: SpeechRecognitionResult): void {
+    this.emit('speech:result', result);
   }
 
-  getVoices(): SpeechSynthesisVoice[] {
-    if ('speechSynthesis' in window) {
-      return window.speechSynthesis.getVoices();
-    }
-    return [];
+  handleSpeechError(error: { error: string }): void {
+    this.emit('speech:error', error);
   }
 
+  // Text-to-Speech - handled by renderer via IPC
   async speak(options: SpeechSynthesisOptions): Promise<void> {
-    if (!('speechSynthesis' in window)) {
-      throw new Error('Speech synthesis not supported');
+    if (this.isSpeaking) {
+      this.stopSpeaking();
     }
+    
+    this.isSpeaking = true;
+    this.emit('speech:start');
+    this.emit('speak:request', options);
+    log.debug('TTS requested:', options.text.substring(0, 50) + '...');
+  }
 
-    return new Promise((resolve, reject) => {
-      const utterance = new SpeechSynthesisUtterance(options.text);
-      
-      if (options.voice) {
-        const voice = this.getVoices().find(v => v.name === options.voice || v.voiceURI === options.voice);
-        if (voice) {
-          utterance.voice = voice;
-        }
-      }
+  onSpeechEnd(): void {
+    this.isSpeaking = false;
+    this.emit('speech:end');
+  }
 
-      utterance.rate = options.rate || 1.0;
-      utterance.pitch = options.pitch || 1.0;
-      utterance.volume = options.volume || 1.0;
-
-      utterance.onend = () => {
-        this.emit('speech:end');
-        resolve();
-      };
-
-      utterance.onerror = (event) => {
-        log.error('Speech synthesis error:', event);
-        this.emit('speech:error', { error: event.error });
-        reject(new Error(event.error));
-      };
-
-      window.speechSynthesis.speak(utterance);
-      this.emit('speech:start');
-
-      log.debug('Speaking:', options.text.substring(0, 50) + '...');
-    });
+  onSpeechError(error: Error): void {
+    this.isSpeaking = false;
+    this.emit('speech:error', { error: error.message });
   }
 
   stopSpeaking(): void {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      this.emit('speech:stopped');
-    }
+    if (!this.isSpeaking) return;
+    this.isSpeaking = false;
+    this.emit('speech:stop');
+    this.emit('speech:stopped');
   }
 
-  // OpenAI Realtime API support
+  isSpeakingActive(): boolean {
+    return this.isSpeaking;
+  }
+
+  // Available voices
   prepareRealtimeConnection(options: {
     apiKey: string;
     model?: string;
@@ -206,27 +136,9 @@ export class RealtimeManager extends EventEmitter {
     };
   }
 
-  // Audio Context for PCM audio processing
-  async initAudioContext(): Promise<AudioContext> {
-    if (!this.audioContext) {
-      this.audioContext = new AudioContext();
-    }
-    return this.audioContext;
-  }
-
-  getAudioContext(): AudioContext | null {
-    return this.audioContext;
-  }
-
   cleanup(): void {
     this.stopListening();
     this.stopSpeaking();
-    
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
-    }
-
     this.removeAllListeners();
     log.info('RealtimeManager cleaned up');
   }
