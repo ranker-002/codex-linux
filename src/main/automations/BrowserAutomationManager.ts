@@ -137,7 +137,14 @@ export class BrowserAutomationManager extends EventEmitter {
         return { hovered: true };
 
       case 'scroll':
-        await page.evaluate((_) => window.scrollTo(0, document.body.scrollHeight));
+        await page.evaluate(() => {
+          /* 
+           * This code runs in browser context via Playwright
+           * TypeScript doesn't know about browser globals here
+           */
+          (window as unknown as { scrollTo: (x: number, y: number) => void })
+            .scrollTo(0, (document as unknown as { body: { scrollHeight: number } }).body.scrollHeight);
+        });
         return { scrolled: true };
 
       default:
