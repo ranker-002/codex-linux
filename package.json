@@ -55,6 +55,7 @@
     "lucide-react": "^0.303.0",
     "monaco-editor": "^0.55.1",
     "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
     "openai": "^4.28.0",
     "prismjs": "^1.29.0",
     "react": "^18.2.0",
