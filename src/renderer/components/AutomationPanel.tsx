@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Automation, Agent, Skill } from '../shared/types';
+import { Automation, Agent, Skill } from '../../shared/types';
 import { Clock, Plus, Play, Pause, Settings, Trash2, Calendar, Zap } from 'lucide-react';
 
 interface AutomationPanelProps {

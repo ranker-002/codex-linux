@@ -43,6 +43,7 @@ export interface Agent {
   status: AgentStatus;
   projectPath: string;
   worktreeName: string;
+  worktreePath?: string;
   providerId: string;
   model: string;
   skills: string[];
@@ -238,6 +239,16 @@ export enum ChangeStatus {
   APPROVED = 'approved',
   REJECTED = 'rejected',
   APPLIED = 'applied'
+}
+
+export interface Checkpoint {
+  id: string;
+  agentId: string;
+  changeId: string;
+  filePath: string;
+  content: string;
+  createdAt: Date;
+  restoredAt?: Date;
 }
 
 export interface Project {

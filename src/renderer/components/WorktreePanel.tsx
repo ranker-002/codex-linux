@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Worktree } from '../shared/types';
+import { Worktree } from '../../shared/types';
 import { GitBranch, Plus, Folder, Trash2, GitMerge } from 'lucide-react';
 
 interface WorktreePanelProps {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { AgentPanel } from './components/AgentPanel';
@@ -8,11 +8,15 @@ import { SkillsPanel } from './components/SkillsPanel';
 import { AutomationPanel } from './components/AutomationPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CodeWorkspace } from './components/CodeWorkspace';
+import { AuditTrailPanel } from './components/AuditTrailPanel';
 import { I18nProvider } from './i18n/I18nProvider';
 import { Agent, Worktree, Skill, Automation, AIProvider, Settings } from '../shared/types';
 import './styles/minimalist.css';
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [agents, setAgents] = useState<Agent[]>([]);
   const [worktrees, setWorktrees] = useState<Worktree[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -22,6 +26,61 @@ function App() {
   const [activeTab, setActiveTab] = useState('agents');
   const [isLoading, setIsLoading] = useState(true);
   const [streamingContent, setStreamingContent] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/' || path.startsWith('/agents')) {
+      setActiveTab('agents');
+      return;
+    }
+    if (path.startsWith('/code')) {
+      setActiveTab('code');
+      return;
+    }
+    if (path.startsWith('/worktrees')) {
+      setActiveTab('worktrees');
+      return;
+    }
+    if (path.startsWith('/skills')) {
+      setActiveTab('skills');
+      return;
+    }
+    if (path.startsWith('/automations')) {
+      setActiveTab('automations');
+      return;
+    }
+    if (path.startsWith('/settings')) {
+      setActiveTab('settings');
+      return;
+    }
+    setActiveTab('agents');
+  }, [location.pathname]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    switch (tab) {
+      case 'agents':
+        navigate('/');
+        break;
+      case 'code':
+        navigate('/code');
+        break;
+      case 'worktrees':
+        navigate('/worktrees');
+        break;
+      case 'skills':
+        navigate('/skills');
+        break;
+      case 'automations':
+        navigate('/automations');
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      default:
+        navigate('/');
+    }
+  };
 
   useEffect(() => {
     loadInitialData();
@@ -172,13 +231,13 @@ function App() {
   return (
     <I18nProvider>
       <div className="flex h-screen bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] overflow-hidden selection:bg-neutral-900 selection:text-white" data-testid="app-container">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
         
         <div className="flex-1 flex flex-col min-w-0">
           <Header 
             activeTab={activeTab}
             agents={agents}
-            onSettingsClick={() => setActiveTab('settings')}
+            onSettingsClick={() => handleTabChange('settings')}
           />
           
           <main className="flex-1 overflow-hidden animate-fadeIn" data-testid="main-content">
@@ -229,6 +288,10 @@ function App() {
                     onCreateAutomation={handleCreateAutomation}
                   />
                 } 
+              />
+              <Route 
+                path="/audit" 
+                element={<AuditTrailPanel />} 
               />
               <Route 
                 path="/settings" 

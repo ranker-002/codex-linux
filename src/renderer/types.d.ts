@@ -93,6 +93,25 @@ export interface ElectronAPI {
     reject: (changeId: string, comment?: string) => Promise<void>;
     apply: (changeId: string) => Promise<void>;
   };
+  checkpoints: {
+    list: (agentId?: string) => Promise<any[]>;
+    restore: (checkpointId: string) => Promise<void>;
+    restoreLast: (agentId: string) => Promise<void>;
+  };
+  queue: {
+    list: (agentId: string) => Promise<any[]>;
+    enqueue: (agentId: string, type: 'message' | 'task', content: string) => Promise<{ id: string }>;
+    delete: (agentId: string, itemId: string) => Promise<void>;
+    moveUp: (agentId: string, itemId: string) => Promise<void>;
+    claimNext: (agentId: string) => Promise<any | null>;
+    complete: (agentId: string, itemId: string, outcome: 'completed' | 'failed', error?: string) => Promise<void>;
+    history: (agentId: string, limit?: number) => Promise<any[]>;
+  };
+  audit: {
+    recent: (limit?: number) => Promise<any[]>;
+    byAction: (action: string, limit?: number) => Promise<any[]>;
+    export: (exportPath: string) => Promise<{ success: boolean }>;
+  };
   git: {
     status: (repoPath: string) => Promise<any>;
     commit: (params: { repoPath: string; message: string; files?: string[] }) => Promise<any>;

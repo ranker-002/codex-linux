@@ -35,6 +35,9 @@ export class AgentOrchestrator extends EventEmitter {
   private readonly INACTIVE_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
   private readonly MAX_RETRIES = 3;
   private readonly RETRY_DELAY = 1000; // 1 second
+  private readonly AUTO_CONTEXT_MAX_FILES = 12;
+  private readonly AUTO_CONTEXT_MAX_CHARS_PER_FILE = 4000;
+  private readonly AUTO_CONTEXT_MAX_TOTAL_CHARS = 24000;
 
   private permissionManager: PermissionManager;
 
@@ -54,6 +57,23 @@ export class AgentOrchestrator extends EventEmitter {
     this.cleanupInterval = setInterval(() => {
       this.cleanupInactiveAgents();
     }, 60 * 60 * 1000);
+
+    // Don't keep the process alive (important for tests)
+    this.cleanupInterval.unref?.();
+  }
+
+  private async getAgentOrThrow(agentId: string): Promise<Agent> {
+    const cached = this.agents.get(agentId);
+    if (cached) return cached;
+
+    const fromDb = await this.dbManager.getAgent(agentId);
+    if (!fromDb) {
+      throw new Error(`Agent ${agentId} not found`);
+    }
+
+    this.agents.set(agentId, fromDb);
+    this.lastActivity.set(agentId, fromDb.lastActiveAt || fromDb.updatedAt);
+    return fromDb;
   }
 
   private async cleanupInactiveAgents(): Promise<void> {
@@ -124,7 +144,7 @@ export class AgentOrchestrator extends EventEmitter {
     const worktreeName = `codex-agent-${agentId.slice(0, 8)}`;
     
     // Create worktree for isolation
-    await this.gitWorktreeManager.createWorktree(config.projectPath, worktreeName);
+    const worktree = await this.gitWorktreeManager.createWorktree(config.projectPath, worktreeName);
     
     // Load CLAUDE.md configuration
     const claudeMdParser = new ClaudeMdParser();
@@ -146,6 +166,7 @@ export class AgentOrchestrator extends EventEmitter {
       status: AgentStatus.IDLE,
       projectPath: mergedConfig.projectPath,
       worktreeName,
+      worktreePath: worktree.path,
       providerId: mergedConfig.providerId,
       model: mergedConfig.model,
       skills: mergedConfig.skills || [],
@@ -157,6 +178,7 @@ export class AgentOrchestrator extends EventEmitter {
       tasks: [],
       metadata: {
         ...mergedConfig.metadata,
+        worktreePath: worktree.path,
         claudeMdConfig: claudeMdConfig ? {
           version: claudeMdConfig.version,
           projectName: claudeMdConfig.project?.name,
@@ -206,10 +228,7 @@ export class AgentOrchestrator extends EventEmitter {
       reasoningEffort?: 'low' | 'medium' | 'high';
     }
   ): Promise<AgentMessage> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
-    }
+    const agent = await this.getAgentOrThrow(agentId);
 
     const userMessage: AgentMessage = {
       id: uuidv4(),
@@ -228,14 +247,18 @@ export class AgentOrchestrator extends EventEmitter {
 
     // Get AI response with retry logic
     try {
-      const response = await this.getAIResponseWithRetry(agent, options);
+      const autoContext = await this.buildAutoContext(agent, message);
+      const response = await this.getAIResponseWithRetry(agent, options, autoContext?.systemMessage);
       
       const assistantMessage: AgentMessage = {
         id: uuidv4(),
         role: 'assistant',
         content: response.content,
         timestamp: new Date(),
-        metadata: response.metadata
+        metadata: {
+          ...response.metadata,
+          autoContext: autoContext?.metadata
+        }
       };
 
       agent.messages.push(assistantMessage);
@@ -279,19 +302,30 @@ export class AgentOrchestrator extends EventEmitter {
         throw new Error(`Provider ${agent.providerId} not found`);
       }
 
+      const autoContext = await this.buildAutoContext(agent, message);
+      const modelMessages = (
+        autoContext?.systemMessage
+          ? [...agent.messages, autoContext.systemMessage]
+          : agent.messages
+      ) as Array<{ role: string; content: string }>;
+
       // Check if provider supports streaming
       if (typeof provider.sendMessageStream === 'function') {
-        await provider.sendMessageStream(agent.model, agent.messages as Array<{ role: string; content: string }>, {
+        await provider.sendMessageStream(agent.model, modelMessages, {
           onChunk: (chunk: string) => {
             callbacks.onChunk(chunk);
           },
           onComplete: async () => {
-            const response = await this.getAIResponseWithRetry(agent);
+            const response = await this.getAIResponseWithRetry(agent, undefined, autoContext?.systemMessage);
             const assistantMessage: AgentMessage = {
               id: uuidv4(),
               role: 'assistant',
               content: response.content,
-              timestamp: new Date()
+              timestamp: new Date(),
+              metadata: {
+                ...response.metadata,
+                autoContext: autoContext?.metadata
+              }
             };
 
             agent.messages.push(assistantMessage);
@@ -309,7 +343,7 @@ export class AgentOrchestrator extends EventEmitter {
         });
       } else {
         // Fallback to non-streaming
-        const response = await this.getAIResponseWithRetry(agent);
+        const response = await this.getAIResponseWithRetry(agent, undefined, autoContext?.systemMessage);
         callbacks.onChunk(response.content);
         
         const assistantMessage: AgentMessage = {
@@ -317,7 +351,10 @@ export class AgentOrchestrator extends EventEmitter {
           role: 'assistant',
           content: response.content,
           timestamp: new Date(),
-          metadata: response.metadata
+          metadata: {
+            ...response.metadata,
+            autoContext: autoContext?.metadata
+          }
         };
 
         agent.messages.push(assistantMessage);
@@ -340,18 +377,144 @@ export class AgentOrchestrator extends EventEmitter {
       extendedThinking?: boolean;
       reasoningEffort?: 'low' | 'medium' | 'high';
     },
+    ephemeralSystemMessage?: AgentMessage,
     attempt: number = 1
   ): Promise<{ content: string; metadata?: Record<string, any> }> {
     try {
-      return await this.getAIResponse(agent, options);
+      return await this.getAIResponse(agent, options, ephemeralSystemMessage);
     } catch (error) {
       if (attempt < this.MAX_RETRIES && this.isRetryableError(error)) {
         log.warn(`Retrying AI request for agent ${agent.id}, attempt ${attempt + 1}/${this.MAX_RETRIES}`);
         await this.delay(this.RETRY_DELAY * attempt); // Exponential backoff
-        return this.getAIResponseWithRetry(agent, options, attempt + 1);
+        return this.getAIResponseWithRetry(agent, options, ephemeralSystemMessage, attempt + 1);
       }
       throw error;
     }
+  }
+
+  private async getAIResponse(
+    agent: Agent,
+    options?: {
+      signal?: AbortSignal;
+      onProgress?: (progress: number) => void;
+      extendedThinking?: boolean;
+      reasoningEffort?: 'low' | 'medium' | 'high';
+    },
+    ephemeralSystemMessage?: AgentMessage
+  ): Promise<{ content: string; metadata?: Record<string, any> }> {
+    const provider = this.aiProviderManager.getProvider(agent.providerId);
+    if (!provider) {
+      throw new Error(`Provider ${agent.providerId} not found`);
+    }
+
+    const messages = (
+      ephemeralSystemMessage
+        ? [...agent.messages, ephemeralSystemMessage]
+        : agent.messages
+    ).map(m => ({ role: m.role, content: m.content })) as Array<{ role: string; content: string }>;
+
+    return await provider.sendMessage(agent.model, messages, {
+      signal: options?.signal,
+      onProgress: options?.onProgress,
+      extendedThinking: options?.extendedThinking,
+      reasoningEffort: options?.reasoningEffort
+    });
+  }
+
+  private async buildAutoContext(
+    agent: Agent,
+    userIntent: string
+  ): Promise<{ systemMessage: AgentMessage; metadata: { files: Array<{ path: string; reason: string }>; totalChars: number } } | null> {
+    const enabled = agent.metadata?.autoContext !== false;
+    if (!enabled) return null;
+
+    if (!agent.projectPath || typeof agent.projectPath !== 'string') {
+      return null;
+    }
+
+    const worktreePath = agent.worktreePath
+      ? agent.worktreePath
+      : (agent.worktreeName
+        ? path.join(agent.projectPath, '.codex', 'worktrees', agent.worktreeName)
+        : agent.projectPath);
+
+    if (!worktreePath || typeof worktreePath !== 'string') {
+      return null;
+    }
+
+    const candidates: Array<{ relPath: string; reason: string }> = [];
+    const addCandidate = (relPath: string, reason: string) => {
+      if (!relPath) return;
+      if (candidates.some(c => c.relPath === relPath)) return;
+      candidates.push({ relPath, reason });
+    };
+
+    // Always-valuable files
+    addCandidate('CLAUDE.md', 'Project conventions');
+    addCandidate('README.md', 'Project overview');
+    addCandidate('package.json', 'Dependencies/scripts');
+    addCandidate('tsconfig.json', 'TypeScript config');
+    addCandidate('tsconfig.main.json', 'Main TS config');
+    addCandidate('tsconfig.renderer.json', 'Renderer TS config');
+
+    // Recently changed files in this worktree
+    try {
+      const changes = await this.gitWorktreeManager.getChanges(worktreePath);
+      const recent = [...changes.staged, ...changes.unstaged].slice(0, 6);
+      for (const f of recent) {
+        addCandidate(f, 'Recently changed in worktree');
+      }
+    } catch {
+      // ignore
+    }
+
+    const selected = candidates.slice(0, this.AUTO_CONTEXT_MAX_FILES);
+    let totalChars = 0;
+    const used: Array<{ path: string; reason: string }> = [];
+    const parts: string[] = [];
+
+    for (const c of selected) {
+      const abs = path.join(worktreePath, c.relPath);
+      try {
+        const raw = await fs.readFile(abs, 'utf-8');
+        const clipped = raw.length > this.AUTO_CONTEXT_MAX_CHARS_PER_FILE
+          ? raw.slice(0, this.AUTO_CONTEXT_MAX_CHARS_PER_FILE) + '\n\n[TRUNCATED]'
+          : raw;
+
+        if (totalChars + clipped.length > this.AUTO_CONTEXT_MAX_TOTAL_CHARS) break;
+
+        totalChars += clipped.length;
+        used.push({ path: c.relPath, reason: c.reason });
+        parts.push(
+          `## ${c.relPath}\nReason: ${c.reason}\n\n${clipped}`
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    if (parts.length === 0) return null;
+
+    const systemMessage: AgentMessage = {
+      id: uuidv4(),
+      role: 'system',
+      content: `# Auto-context (ephemeral)\nUser intent: ${userIntent}\n\n${parts.join('\n\n')}`,
+      timestamp: new Date(),
+      metadata: {
+        autoContext: {
+          files: used,
+          totalChars
+        }
+      }
+    };
+
+    return {
+      systemMessage,
+      metadata: {
+        files: used,
+        totalChars
+      }
+    };
   }
 
   private isRetryableError(error: any): boolean {
@@ -372,10 +535,7 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   async executeTask(agentId: string, task: string, timeout: number = 30 * 60 * 1000): Promise<AgentTask> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
-    }
+    const agent = await this.getAgentOrThrow(agentId);
 
     const taskId = uuidv4();
     const agentTask: AgentTask = {
@@ -426,9 +586,6 @@ export class AgentOrchestrator extends EventEmitter {
     abortController: AbortController
   ): Promise<void> {
     try {
-      // Get worktree path
-      const worktreePath = path.join(agent.projectPath, '.git', 'worktrees', agent.worktreeName);
-      
       // Set up task context
       const taskMessage: AgentMessage = {
         id: uuidv4(),
@@ -440,13 +597,14 @@ export class AgentOrchestrator extends EventEmitter {
       agent.messages.push(taskMessage);
 
       // Process the task with streaming updates
+      const autoContext = await this.buildAutoContext(agent, task.description);
       const response = await this.getAIResponse(agent, {
         signal: abortController.signal,
         onProgress: (progress) => {
           task.progress = progress;
           this.emit('agent:progress', { agentId: agent.id, taskId: task.id, progress });
         }
-      });
+      }, autoContext?.systemMessage);
 
       // Parse and apply code changes
       const changes = await this.parseAndApplyChanges(agent, response.content);
@@ -461,7 +619,10 @@ export class AgentOrchestrator extends EventEmitter {
         role: 'assistant',
         content: response.content,
         timestamp: new Date(),
-        metadata: { changes: changes.map(c => c.id) }
+        metadata: {
+          changes: changes.map(c => c.id),
+          autoContext: autoContext?.metadata
+        }
       };
 
       agent.messages.push(assistantMessage);
@@ -488,10 +649,7 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   async pauseAgent(agentId: string): Promise<void> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
-    }
+    const agent = await this.getAgentOrThrow(agentId);
 
     // Abort any running tasks
     for (const [taskId, controller] of this.activeTasks) {
@@ -509,10 +667,7 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   async resumeAgent(agentId: string): Promise<void> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
-    }
+    const agent = await this.getAgentOrThrow(agentId);
 
     agent.status = AgentStatus.IDLE;
     await this.dbManager.updateAgent(agent);
@@ -521,10 +676,7 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   async stopAgent(agentId: string): Promise<void> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
-    }
+    const agent = await this.getAgentOrThrow(agentId);
 
     // Abort all tasks
     for (const [taskId, controller] of this.activeTasks) {
@@ -543,10 +695,7 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   async deleteAgent(agentId: string): Promise<void> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
-    }
+    const agent = await this.getAgentOrThrow(agentId);
 
     // Stop any running tasks
     await this.stopAgent(agentId);
@@ -567,10 +716,7 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   async applySkills(agentId: string, skillIds: string[]): Promise<void> {
-    const agent = this.agents.get(agentId);
-    if (!agent) {
-      throw new Error(`Agent ${agentId} not found`);
-    }
+    const agent = await this.getAgentOrThrow(agentId);
 
     await this.applySkillsInternal(agent, skillIds);
     agent.skills = [...new Set([...agent.skills, ...skillIds])];
@@ -598,41 +744,17 @@ export class AgentOrchestrator extends EventEmitter {
     }
   }
 
-  private async getAIResponse(
-    agent: Agent,
-    options?: {
-      signal?: AbortSignal;
-      onProgress?: (progress: number) => void;
-      extendedThinking?: boolean;
-      reasoningEffort?: 'low' | 'medium' | 'high';
-    }
-  ): Promise<{ content: string; metadata?: Record<string, any> }> {
-    const provider = this.aiProviderManager.getProvider(agent.providerId);
-    if (!provider) {
-      throw new Error(`Provider ${agent.providerId} not found`);
-    }
-
-    return await provider.sendMessage(
-      agent.model, 
-      agent.messages.map(m => ({ role: m.role, content: m.content })) as Array<{ role: string; content: string }>, 
-      {
-        signal: options?.signal,
-        onProgress: options?.onProgress,
-        extendedThinking: options?.extendedThinking,
-        reasoningEffort: options?.reasoningEffort
-      }
-    );
-  }
-
   private async parseAndApplyChanges(agent: Agent, content: string): Promise<CodeChange[]> {
     const changes: CodeChange[] = [];
     
     const diffRegex = /diff --git a\/(.+?) b\/(.+?)\n([\s\S]*?)(?=\ndiff --git|$)/g;
     
     let match;
-    const worktreePath = agent.worktreeName 
-      ? path.join(agent.projectPath, '.git', 'worktrees', agent.worktreeName)
-      : agent.projectPath;
+    const worktreePath = agent.worktreePath
+      ? agent.worktreePath
+      : (agent.worktreeName
+        ? path.join(agent.projectPath, '.codex', 'worktrees', agent.worktreeName)
+        : agent.projectPath);
     
     while ((match = diffRegex.exec(content)) !== null) {
       const [, oldFile, newFile, diffContent] = match;
@@ -664,20 +786,7 @@ export class AgentOrchestrator extends EventEmitter {
       
       changes.push(change);
       await this.dbManager.createCodeChange(change);
-    }
-
-    for (const change of changes) {
-      try {
-        const filePath = path.join(worktreePath, change.filePath);
-        
-        await fs.mkdir(path.dirname(filePath), { recursive: true });
-        
-        await fs.writeFile(filePath, change.newContent, 'utf-8');
-        
-        log.info(`Applied change to ${change.filePath} in worktree ${agent.worktreeName}`);
-      } catch (error) {
-        log.error(`Failed to apply change to ${change.filePath}:`, error);
-      }
+      this.emit('changes:created', { agentId: agent.id, changeId: change.id });
     }
 
     return changes;

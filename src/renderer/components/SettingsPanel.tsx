@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, AIProvider } from '../shared/types';
+import { Settings, AIProvider } from '../../shared/types';
 import { Settings as SettingsIcon, Key, Eye, EyeOff, Save } from 'lucide-react';
 
 interface SettingsPanelProps {

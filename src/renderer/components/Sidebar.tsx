@@ -6,7 +6,8 @@ import {
   Clock, 
   Settings,
   ChevronRight,
-  Code2
+  Code2,
+  ScrollText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +22,7 @@ const menuItems = [
   { id: 'worktrees', label: 'Worktrees', icon: GitBranch, description: 'Git workspaces' },
   { id: 'skills', label: 'Skills', icon: Wrench, description: 'Reusable prompts' },
   { id: 'automations', label: 'Automations', icon: Clock, description: 'Scheduled tasks' },
+  { id: 'audit', label: 'Audit', icon: ScrollText, description: 'Activity log' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {

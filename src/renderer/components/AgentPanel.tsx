@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Agent, AIProvider, Skill } from '../shared/types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Agent, AIProvider, Skill, CodeChange, ChangeStatus } from '../../shared/types';
 import { 
   Bot, 
   Plus, 
@@ -10,6 +10,7 @@ import {
   MessageSquare,
   MoreVertical
 } from 'lucide-react';
+import DiffViewer from './DiffViewer';
 
 interface AgentPanelProps {
   agents: Agent[];
@@ -28,6 +29,15 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [changes, setChanges] = useState<CodeChange[]>([]);
+  const [changesLoading, setChangesLoading] = useState(false);
+  const [queueItems, setQueueItems] = useState<Array<{ id: string; type: 'message' | 'task'; content: string; status?: 'pending' | 'running'; position?: number; createdAt?: number }>>([]);
+  const [queueHistory, setQueueHistory] = useState<Array<{ id: string; type: 'message' | 'task'; content: string; status: string; createdAt: Date; completedAt?: Date; error?: string }>>([]);
+  const [showQueueHistory, setShowQueueHistory] = useState(false);
+  const [inFlightByAgent, setInFlightByAgent] = useState<Record<string, boolean>>({});
+  const [claimedByAgent, setClaimedByAgent] = useState<Record<string, { id: string; type: 'message' | 'task'; content: string } | null>>({});
+  const [newQueueType, setNewQueueType] = useState<'message' | 'task'>('task');
+  const [newQueueContent, setNewQueueContent] = useState('');
   const [newAgentConfig, setNewAgentConfig] = useState({
     name: '',
     projectPath: '',
@@ -35,6 +45,160 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
     model: '',
     skills: [] as string[]
   });
+
+  const selectedAgentChanges = useMemo(() => {
+    if (!selectedAgent) return [];
+    return changes.filter(c => c.agentId === selectedAgent.id);
+  }, [changes, selectedAgent]);
+
+  const refreshChanges = async (agentId: string) => {
+    setChangesLoading(true);
+    try {
+      const list = await window.electronAPI.changes.list(agentId);
+      setChanges(list as CodeChange[]);
+    } catch (error) {
+      console.error('Failed to load code changes:', error);
+    } finally {
+      setChangesLoading(false);
+    }
+  };
+
+  const refreshQueue = async (agentId: string) => {
+    try {
+      const list = await window.electronAPI.queue.list(agentId);
+      setQueueItems(list as any);
+    } catch (error) {
+      console.error('Failed to load queue:', error);
+    }
+  };
+
+  const refreshQueueHistory = async (agentId: string) => {
+    try {
+      const history = await window.electronAPI.queue.history(agentId, 20);
+      setQueueHistory(history as any);
+    } catch (error) {
+      console.error('Failed to load queue history:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedAgent) return;
+    void refreshChanges(selectedAgent.id);
+    void refreshQueue(selectedAgent.id);
+    void refreshQueueHistory(selectedAgent.id);
+  }, [selectedAgent?.id]);
+
+  useEffect(() => {
+    const onTaskStarted = (event: any, payload: { agentId: string }) => {
+      setInFlightByAgent(prev => ({ ...prev, [payload.agentId]: true }));
+    };
+
+    const onTaskCompleted = async (event: any, payload: { agentId: string }) => {
+      const claimed = claimedByAgent[payload.agentId];
+      if (claimed) {
+        try {
+          await window.electronAPI.queue.complete(payload.agentId, claimed.id, 'completed');
+          await refreshQueue(payload.agentId);
+        } catch (error) {
+          console.error('Failed to complete queued item:', error);
+        }
+        setClaimedByAgent(prev => ({ ...prev, [payload.agentId]: null }));
+      }
+      setInFlightByAgent(prev => ({ ...prev, [payload.agentId]: false }));
+    };
+
+    const onTaskFailed = async (event: any, payload: { agentId: string; error?: any }) => {
+      const claimed = claimedByAgent[payload.agentId];
+      if (claimed) {
+        try {
+          await window.electronAPI.queue.complete(payload.agentId, claimed.id, 'failed', payload.error ? String(payload.error) : undefined);
+          await refreshQueue(payload.agentId);
+        } catch (error) {
+          console.error('Failed to fail queued item:', error);
+        }
+        setClaimedByAgent(prev => ({ ...prev, [payload.agentId]: null }));
+      }
+      setInFlightByAgent(prev => ({ ...prev, [payload.agentId]: false }));
+    };
+
+    window.electronAPI.on('agent:taskStarted', onTaskStarted);
+    window.electronAPI.on('agent:taskCompleted', onTaskCompleted);
+    window.electronAPI.on('agent:taskFailed', onTaskFailed);
+
+    return () => {
+      window.electronAPI.removeListener('agent:taskStarted', onTaskStarted);
+      window.electronAPI.removeListener('agent:taskCompleted', onTaskCompleted);
+      window.electronAPI.removeListener('agent:taskFailed', onTaskFailed);
+    };
+  }, [claimedByAgent]);
+
+  useEffect(() => {
+    if (!selectedAgent) return;
+    const agentId = selectedAgent.id;
+    const inFlight = Boolean(inFlightByAgent[agentId]);
+
+    if (inFlight) return;
+    if (claimedByAgent[agentId]) return;
+
+    const hasPending = queueItems.some(i => (i.status || 'pending') === 'pending');
+    if (!hasPending) return;
+
+    setInFlightByAgent(prev => ({ ...prev, [agentId]: true }));
+
+    (async () => {
+      try {
+        const claimed = await window.electronAPI.queue.claimNext(agentId);
+        if (!claimed) {
+          setInFlightByAgent(prev => ({ ...prev, [agentId]: false }));
+          return;
+        }
+
+        setClaimedByAgent(prev => ({ ...prev, [agentId]: claimed }));
+        await refreshQueue(agentId);
+
+        if (claimed.type === 'message') {
+          await window.electronAPI.agent.sendMessage(agentId, claimed.content);
+          await window.electronAPI.queue.complete(agentId, claimed.id, 'completed');
+          setClaimedByAgent(prev => ({ ...prev, [agentId]: null }));
+          await refreshQueue(agentId);
+          setInFlightByAgent(prev => ({ ...prev, [agentId]: false }));
+        } else {
+          await window.electronAPI.agent.executeTask(agentId, claimed.content);
+          // keep inFlight until taskCompleted/taskFailed
+        }
+      } catch (error) {
+        console.error('Failed to dispatch queued item:', error);
+        const claimed = claimedByAgent[agentId];
+        if (claimed) {
+          try {
+            await window.electronAPI.queue.complete(agentId, claimed.id, 'failed', error instanceof Error ? error.message : String(error));
+          } catch {
+            // ignore
+          }
+          setClaimedByAgent(prev => ({ ...prev, [agentId]: null }));
+        }
+        setInFlightByAgent(prev => ({ ...prev, [agentId]: false }));
+        await refreshQueue(agentId);
+        await window.electronAPI.notification.show({
+          title: 'Queue dispatch failed',
+          body: error instanceof Error ? error.message : String(error)
+        });
+      }
+    })();
+  }, [queueItems, inFlightByAgent, claimedByAgent, selectedAgent?.id]);
+
+  useEffect(() => {
+    const handler = (event: any, payload: { agentId: string; changeId: string }) => {
+      if (!selectedAgent) return;
+      if (payload.agentId !== selectedAgent.id) return;
+      void refreshChanges(selectedAgent.id);
+    };
+
+    window.electronAPI.on('changes:created', handler);
+    return () => {
+      window.electronAPI.removeListener('changes:created', handler);
+    };
+  }, [selectedAgent?.id]);
 
   const handleCreateAgent = async () => {
     try {
@@ -65,6 +229,65 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
       await window.electronAPI.agent.executeTask(agentId, task);
     } catch (error) {
       console.error('Failed to execute task:', error);
+    }
+  };
+
+  const handleApproveChange = async (changeId: string) => {
+    if (!selectedAgent) return;
+    try {
+      await window.electronAPI.changes.approve(changeId);
+      await refreshChanges(selectedAgent.id);
+      await window.electronAPI.notification.show({
+        title: 'Change approved',
+        body: 'The change is approved and ready to apply.'
+      });
+    } catch (error) {
+      console.error('Failed to approve change:', error);
+      await window.electronAPI.notification.show({
+        title: 'Approve failed',
+        body: error instanceof Error ? error.message : String(error)
+      });
+    }
+  };
+
+  const handleRejectChange = async (changeId: string, comment?: string) => {
+    if (!selectedAgent) return;
+    try {
+      const finalComment =
+        typeof comment === 'string'
+          ? comment
+          : (window.prompt('Rejection comment (optional):') ?? undefined);
+
+      await window.electronAPI.changes.reject(changeId, finalComment);
+      await refreshChanges(selectedAgent.id);
+      await window.electronAPI.notification.show({
+        title: 'Change rejected',
+        body: 'The change was rejected.'
+      });
+    } catch (error) {
+      console.error('Failed to reject change:', error);
+      await window.electronAPI.notification.show({
+        title: 'Reject failed',
+        body: error instanceof Error ? error.message : String(error)
+      });
+    }
+  };
+
+  const handleApplyChange = async (changeId: string) => {
+    if (!selectedAgent) return;
+    try {
+      await window.electronAPI.changes.apply(changeId);
+      await refreshChanges(selectedAgent.id);
+      await window.electronAPI.notification.show({
+        title: 'Change applied',
+        body: 'The change was written to the worktree.'
+      });
+    } catch (error) {
+      console.error('Failed to apply change:', error);
+      await window.electronAPI.notification.show({
+        title: 'Apply failed',
+        body: error instanceof Error ? error.message : String(error)
+      });
     }
   };
 
@@ -159,73 +382,246 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
             </div>
 
             <div className="flex-1 overflow-auto p-4">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Status</h3>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      selectedAgent.status === 'running' ? 'bg-green-500/10 text-green-500' :
-                      selectedAgent.status === 'paused' ? 'bg-yellow-500/10 text-yellow-500' :
-                      selectedAgent.status === 'error' ? 'bg-red-500/10 text-red-500' :
-                      'bg-gray-500/10 text-gray-500'
-                    }`}>
-                      {selectedAgent.status}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Skills</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedAgent.skills.map(skillId => {
-                      const skill = skills.find(s => s.id === skillId);
-                      return (
-                        <span
-                          key={skillId}
-                          className="px-2 py-1 bg-muted rounded-md text-xs"
-                        >
-                          {skill?.name || skillId}
-                        </span>
-                      );
-                    })}
-                    {selectedAgent.skills.length === 0 && (
-                      <span className="text-sm text-muted-foreground">No skills applied</span>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Recent Tasks</h3>
-                  <div className="space-y-2">
-                    {selectedAgent.tasks.slice(-5).map(task => (
-                      <div
-                        key={task.id}
-                        className="p-3 bg-muted rounded-md"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">{task.description}</span>
-                          <span className={`text-xs ${
-                            task.status === 'completed' ? 'text-green-500' :
-                            task.status === 'failed' ? 'text-red-500' :
-                            task.status === 'running' ? 'text-blue-500' :
-                            'text-muted-foreground'
-                          }`}>
-                            {task.status}
-                          </span>
-                        </div>
-                        {task.status === 'running' && (
-                          <div className="mt-2 h-1 bg-muted-foreground/20 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary transition-all"
-                              style={{ width: `${task.progress}%` }}
-                            />
-                          </div>
-                        )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="bg-card border border-border rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium">Queue</h3>
+                        <p className="text-xs text-muted-foreground">Stack work while the agent is busy</p>
                       </div>
-                    ))}
-                    {selectedAgent.tasks.length === 0 && (
-                      <span className="text-sm text-muted-foreground">No tasks yet</span>
+                      <span className="text-xs text-muted-foreground">
+                        {queueItems.length} queued
+                        {inFlightByAgent[selectedAgent.id] ? ' • running' : ''}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <select
+                        value={newQueueType}
+                        onChange={e => setNewQueueType(e.target.value as any)}
+                        className="px-2 py-2 bg-background border border-input rounded-md text-sm"
+                      >
+                        <option value="task">Task</option>
+                        <option value="message">Message</option>
+                      </select>
+                      <input
+                        value={newQueueContent}
+                        onChange={e => setNewQueueContent(e.target.value)}
+                        placeholder={newQueueType === 'task' ? 'Describe the task...' : 'Type a message...'}
+                        className="flex-1 px-3 py-2 bg-background border border-input rounded-md text-sm"
+                      />
+                      <button
+                        onClick={() => {
+                          if (!newQueueContent.trim() || !selectedAgent) return;
+                          const agentId = selectedAgent.id;
+                          (async () => {
+                            try {
+                              await window.electronAPI.queue.enqueue(agentId, newQueueType, newQueueContent.trim());
+                              setNewQueueContent('');
+                              await refreshQueue(agentId);
+                            } catch (error) {
+                              await window.electronAPI.notification.show({
+                                title: 'Enqueue failed',
+                                body: error instanceof Error ? error.message : String(error)
+                              });
+                            }
+                          })();
+                        }}
+                        className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm"
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    <div className="mt-3 space-y-2 max-h-40 overflow-auto">
+                      {queueItems.map((item, idx) => (
+                        <div key={item.id} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-background border border-border">
+                            {item.type}
+                          </span>
+                          <span className="text-sm flex-1 truncate">{item.content}</span>
+                          <button
+                            onClick={() => {
+                              const agentId = selectedAgent.id;
+                              (async () => {
+                                await window.electronAPI.queue.delete(agentId, item.id);
+                                await refreshQueue(agentId);
+                              })();
+                            }}
+                            className="text-xs text-destructive hover:underline"
+                          >
+                            Remove
+                          </button>
+                          <button
+                            disabled={idx === 0}
+                            onClick={() => {
+                              const agentId = selectedAgent.id;
+                              (async () => {
+                                await window.electronAPI.queue.moveUp(agentId, item.id);
+                                await refreshQueue(agentId);
+                              })();
+                            }}
+                            className="text-xs text-muted-foreground disabled:opacity-50"
+                          >
+                            Up
+                          </button>
+                        </div>
+                      ))}
+                      {queueItems.length === 0 && (
+                        <div className="text-xs text-muted-foreground">No queued items</div>
+                      )}
+                    </div>
+
+                    {/* Queue History */}
+                    <div className="mt-3">
+                      <button
+                        onClick={() => setShowQueueHistory(!showQueueHistory)}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        {showQueueHistory ? 'Hide' : 'Show'} history ({queueHistory.length})
+                      </button>
+                      {showQueueHistory && (
+                        <div className="mt-2 space-y-1 max-h-32 overflow-auto">
+                          {queueHistory.map(item => (
+                            <div key={item.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md text-xs">
+                              <span className={`px-1.5 py-0.5 rounded-full ${
+                                item.status === 'completed' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                              }`}>
+                                {item.status}
+                              </span>
+                              <span className="text-muted-foreground">{item.type}</span>
+                              <span className="flex-1 truncate">{item.content}</span>
+                              {item.error && (
+                                <span className="text-red-500 truncate" title={item.error}>⚠️</span>
+                              )}
+                            </div>
+                          ))}
+                          {queueHistory.length === 0 && (
+                            <div className="text-xs text-muted-foreground">No completed items yet</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Status</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedAgent.status === 'running' ? 'bg-green-500/10 text-green-500' :
+                        selectedAgent.status === 'paused' ? 'bg-yellow-500/10 text-yellow-500' :
+                        selectedAgent.status === 'error' ? 'bg-red-500/10 text-red-500' :
+                        'bg-gray-500/10 text-gray-500'
+                      }`}>
+                        {selectedAgent.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Skills</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedAgent.skills.map(skillId => {
+                        const skill = skills.find(s => s.id === skillId);
+                        return (
+                          <span
+                            key={skillId}
+                            className="px-2 py-1 bg-muted rounded-md text-xs"
+                          >
+                            {skill?.name || skillId}
+                          </span>
+                        );
+                      })}
+                      {selectedAgent.skills.length === 0 && (
+                        <span className="text-sm text-muted-foreground">No skills applied</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Recent Tasks</h3>
+                    <div className="space-y-2">
+                      {selectedAgent.tasks.slice(-5).map(task => (
+                        <div
+                          key={task.id}
+                          className="p-3 bg-muted rounded-md"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{task.description}</span>
+                            <span className={`text-xs ${
+                              task.status === 'completed' ? 'text-green-500' :
+                              task.status === 'failed' ? 'text-red-500' :
+                              task.status === 'running' ? 'text-blue-500' :
+                              'text-muted-foreground'
+                            }`}>
+                              {task.status}
+                            </span>
+                          </div>
+                          {task.status === 'running' && (
+                            <div className="mt-2 h-1 bg-muted-foreground/20 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all"
+                                style={{ width: `${task.progress}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {selectedAgent.tasks.length === 0 && (
+                        <span className="text-sm text-muted-foreground">No tasks yet</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-card border border-border rounded-lg overflow-hidden min-h-[420px]">
+                  <div className="p-3 border-b border-border flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium">Changes</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Review and apply changes generated by the agent
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!selectedAgent) return;
+                        try {
+                          const checkpoints = await window.electronAPI.checkpoints.list(selectedAgent.id);
+                          const lastPending = (checkpoints as any[]).find(c => !c.restoredAt);
+                          const restoredFilePath = lastPending?.filePath as string | undefined;
+
+                          await window.electronAPI.checkpoints.restoreLast(selectedAgent.id);
+                          await refreshChanges(selectedAgent.id);
+                          await window.electronAPI.notification.show({
+                            title: 'Checkpoint restored',
+                            body: restoredFilePath
+                              ? `Rolled back: ${restoredFilePath}`
+                              : 'Last applied change was rolled back.'
+                          });
+                        } catch (error) {
+                          await window.electronAPI.notification.show({
+                            title: 'Rollback failed',
+                            body: error instanceof Error ? error.message : String(error)
+                          });
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded-md"
+                    >
+                      Undo last apply
+                    </button>
+                    {changesLoading && (
+                      <span className="text-xs text-muted-foreground">Loading...</span>
                     )}
+                  </div>
+
+                  <div className="h-[520px]">
+                    <DiffViewer
+                      changes={selectedAgentChanges.filter(c => c.status !== ChangeStatus.APPLIED)}
+                      onApprove={handleApproveChange}
+                      onReject={handleRejectChange}
+                      onApply={handleApplyChange}
+                    />
                   </div>
                 </div>
               </div>
