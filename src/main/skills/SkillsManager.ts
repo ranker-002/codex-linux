@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as yaml from 'yaml';
 import log from 'electron-log';
-import { Skill, SkillFile, SkillConfig, SkillParameter } from '../shared/types';
+import { Skill, SkillFile, SkillConfig, SkillParameter } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const DEFAULT_SKILLS_DIR = path.join(__dirname, '../../assets/skills');

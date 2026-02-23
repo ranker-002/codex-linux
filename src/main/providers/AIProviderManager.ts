@@ -2,18 +2,29 @@ import { EventEmitter } from 'events';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import log from 'electron-log';
-import { AIProvider, ProviderConfig, ProviderModel, AgentMessage } from '../shared/types';
-import { SettingsManager } from './SettingsManager';
+import { AIProvider, ProviderConfig, ProviderModel } from '../../shared/types';
+import { SettingsManager } from '../SettingsManager';
 
 interface AIProviderInterface {
   sendMessage(
     model: string,
-    messages: AgentMessage[],
+    messages: Array<{ role: string; content: string }>,
     options?: {
       signal?: AbortSignal;
       onProgress?: (progress: number) => void;
+      extendedThinking?: boolean;
+      reasoningEffort?: 'low' | 'medium' | 'high';
     }
   ): Promise<{ content: string; metadata?: Record<string, any> }>;
+  sendMessageStream?(
+    model: string,
+    messages: Array<{ role: string; content: string }>,
+    callbacks?: {
+      onChunk?: (chunk: string) => void;
+      onComplete?: () => void;
+      onError?: (error: Error) => void;
+    }
+  ): Promise<{ content: string }>;
   listModels(): ProviderModel[];
   testConnection(): Promise<boolean>;
 }
@@ -35,10 +46,12 @@ class OpenAIProvider implements AIProviderInterface {
 
   async sendMessage(
     model: string,
-    messages: AgentMessage[],
+    messages: Array<{ role: string; content: string }>,
     options?: {
       signal?: AbortSignal;
       onProgress?: (progress: number) => void;
+      extendedThinking?: boolean;
+      reasoningEffort?: 'low' | 'medium' | 'high';
     }
   ): Promise<{ content: string; metadata?: Record<string, any> }> {
     const openaiMessages = messages.map(m => ({
@@ -46,22 +59,33 @@ class OpenAIProvider implements AIProviderInterface {
       content: m.content
     }));
 
-    const response = await this.client.chat.completions.create({
+    const requestParams: any = {
       model,
       messages: openaiMessages,
       stream: false
-    }, {
+    };
+
+    // Add reasoning_effort for models that support it
+    if (options?.extendedThinking && model.startsWith('o1')) {
+      requestParams.reasoning_effort = options.reasoningEffort || 'medium';
+    }
+
+    const response = await this.client.chat.completions.create(requestParams, {
       signal: options?.signal
     });
 
     const content = response.choices[0]?.message?.content || '';
+    const reasoning = (response.choices[0]?.message as any)?.reasoning_content;
     
     return {
       content,
       metadata: {
         model: response.model,
         usage: response.usage,
-        finishReason: response.choices[0]?.finish_reason
+        finishReason: response.choices[0]?.finish_reason,
+        reasoning: reasoning || null,
+        extendedThinking: options?.extendedThinking || false,
+        reasoningEffort: options?.reasoningEffort
       }
     };
   }
@@ -137,7 +161,7 @@ class AnthropicProvider implements AIProviderInterface {
 
   async sendMessage(
     model: string,
-    messages: AgentMessage[],
+    messages: Array<{ role: string; content: string }>,
     options?: {
       signal?: AbortSignal;
       onProgress?: (progress: number) => void;
@@ -213,7 +237,11 @@ class AnthropicProvider implements AIProviderInterface {
 
   async testConnection(): Promise<boolean> {
     try {
-      await this.client.models.list();
+      await this.client.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'test' }]
+      });
       return true;
     } catch (error) {
       return false;
@@ -240,7 +268,7 @@ export class AIProviderManager extends EventEmitter {
         description: 'Access to GPT-4, GPT-4o, and Codex models',
         enabled: true,
         config: {
-          apiKey: this.settingsManager.get('openai.apiKey') || '',
+          apiKey: this.settingsManager.getAny('openai.apiKey') as string || '',
           baseUrl: 'https://api.openai.com/v1',
           timeout: 60000,
           maxRetries: 3
@@ -253,7 +281,7 @@ export class AIProviderManager extends EventEmitter {
         description: 'Access to Claude models',
         enabled: true,
         config: {
-          apiKey: this.settingsManager.get('anthropic.apiKey') || '',
+          apiKey: this.settingsManager.getAny('anthropic.apiKey') as string || '',
           baseUrl: 'https://api.anthropic.com',
           timeout: 60000,
           maxRetries: 3
@@ -268,7 +296,7 @@ export class AIProviderManager extends EventEmitter {
     }
 
     // Load active provider from settings
-    const savedActiveProvider = this.settingsManager.get('activeProvider');
+    const savedActiveProvider = this.settingsManager.getAny('activeProvider') as string;
     if (savedActiveProvider && this.providers.has(savedActiveProvider)) {
       this.activeProviderId = savedActiveProvider;
     }
@@ -298,13 +326,17 @@ export class AIProviderManager extends EventEmitter {
     return this.providers.get(this.activeProviderId) || null;
   }
 
+  getActiveProviderInstance(): AIProviderInterface | null {
+    return this.providerInstances.get(this.activeProviderId) || null;
+  }
+
   setActiveProvider(providerId: string): void {
     if (!this.providers.has(providerId)) {
       throw new Error(`Provider ${providerId} not found`);
     }
     
     this.activeProviderId = providerId;
-    this.settingsManager.set('activeProvider', providerId);
+    this.settingsManager.setAny('activeProvider', providerId);
     this.emit('provider:changed', providerId);
   }
 
@@ -322,7 +354,7 @@ export class AIProviderManager extends EventEmitter {
     
     // Save API key to settings
     if (config.apiKey) {
-      this.settingsManager.set(`${providerId}.apiKey`, config.apiKey);
+      this.settingsManager.setAny(`${providerId}.apiKey`, config.apiKey);
     }
 
     // Recreate provider instance with new config

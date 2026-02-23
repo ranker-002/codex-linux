@@ -1,10 +1,10 @@
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import log from 'electron-log';
-import { AgentOrchestrator } from './agents/AgentOrchestrator';
-import { DatabaseManager } from './DatabaseManager';
+import { AgentOrchestrator } from '../agents/AgentOrchestrator';
+import { DatabaseManager } from '../DatabaseManager';
 import { NotificationManager } from '../notifications/NotificationManager';
-import { Agent, AgentStatus, TaskStatus } from '../shared/types';
+import { Agent, AgentStatus, TaskStatus } from '../../shared/types';
 
 interface CoworkSession {
   id: string;

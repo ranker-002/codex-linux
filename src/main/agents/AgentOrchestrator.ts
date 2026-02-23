@@ -3,11 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import log from 'electron-log';
-import { Agent, AgentStatus, AgentMessage, AgentTask, TaskStatus, CodeChange, ChangeStatus } from '../shared/types';
+import { Agent, AgentStatus, AgentMessage, AgentTask, TaskStatus, CodeChange, ChangeStatus, PermissionMode } from '../../shared/types';
 import { GitWorktreeManager } from '../git/GitWorktreeManager';
 import { SkillsManager } from '../skills/SkillsManager';
 import { DatabaseManager } from '../DatabaseManager';
 import { AIProviderManager } from '../providers/AIProviderManager';
+import { PermissionManager } from '../security/PermissionManager';
 
 interface AgentConfig {
   name: string;
@@ -34,6 +35,8 @@ export class AgentOrchestrator extends EventEmitter {
   private readonly MAX_RETRIES = 3;
   private readonly RETRY_DELAY = 1000; // 1 second
 
+  private permissionManager: PermissionManager;
+
   constructor(
     private aiProviderManager: AIProviderManager,
     private gitWorktreeManager: GitWorktreeManager,
@@ -41,6 +44,7 @@ export class AgentOrchestrator extends EventEmitter {
     private dbManager: DatabaseManager
   ) {
     super();
+    this.permissionManager = new PermissionManager();
     this.startCleanupInterval();
   }
 
@@ -130,6 +134,7 @@ export class AgentOrchestrator extends EventEmitter {
       providerId: config.providerId,
       model: config.model,
       skills: config.skills || [],
+      permissionMode: this.permissionManager.getDefaultMode(),
       createdAt: new Date(),
       updatedAt: new Date(),
       lastActiveAt: null,
@@ -171,7 +176,14 @@ export class AgentOrchestrator extends EventEmitter {
     return this.agents.get(agentId) || null;
   }
 
-  async sendMessage(agentId: string, message: string): Promise<AgentMessage> {
+  async sendMessage(
+    agentId: string,
+    message: string,
+    options?: {
+      extendedThinking?: boolean;
+      reasoningEffort?: 'low' | 'medium' | 'high';
+    }
+  ): Promise<AgentMessage> {
     const agent = this.agents.get(agentId);
     if (!agent) {
       throw new Error(`Agent ${agentId} not found`);
@@ -194,7 +206,7 @@ export class AgentOrchestrator extends EventEmitter {
 
     // Get AI response with retry logic
     try {
-      const response = await this.getAIResponseWithRetry(agent);
+      const response = await this.getAIResponseWithRetry(agent, options);
       
       const assistantMessage: AgentMessage = {
         id: uuidv4(),
@@ -247,35 +259,31 @@ export class AgentOrchestrator extends EventEmitter {
 
       // Check if provider supports streaming
       if (typeof provider.sendMessageStream === 'function') {
-        const stream = await provider.sendMessageStream(agent.model, agent.messages);
-        
-        let fullContent = '';
-        
-        stream.on('data', (chunk: string) => {
-          fullContent += chunk;
-          callbacks.onChunk(chunk);
-        });
-        
-        stream.on('end', async () => {
-          const assistantMessage: AgentMessage = {
-            id: uuidv4(),
-            role: 'assistant',
-            content: fullContent,
-            timestamp: new Date()
-          };
+        await provider.sendMessageStream(agent.model, agent.messages as Array<{ role: string; content: string }>, {
+          onChunk: (chunk: string) => {
+            callbacks.onChunk(chunk);
+          },
+          onComplete: async () => {
+            const response = await this.getAIResponseWithRetry(agent);
+            const assistantMessage: AgentMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: response.content,
+              timestamp: new Date()
+            };
 
-          agent.messages.push(assistantMessage);
-          agent.status = AgentStatus.IDLE;
-          await this.dbManager.updateAgent(agent);
+            agent.messages.push(assistantMessage);
+            agent.status = AgentStatus.IDLE;
+            await this.dbManager.updateAgent(agent);
 
-          this.emit('agent:message', { agentId, message: assistantMessage });
-          callbacks.onComplete();
-        });
-        
-        stream.on('error', (error: Error) => {
-          agent.status = AgentStatus.ERROR;
-          this.dbManager.updateAgent(agent);
-          callbacks.onError(error);
+            this.emit('agent:message', { agentId, message: assistantMessage });
+            callbacks.onComplete();
+          },
+          onError: async (error: Error) => {
+            agent.status = AgentStatus.ERROR;
+            await this.dbManager.updateAgent(agent);
+            callbacks.onError(error);
+          }
         });
       } else {
         // Fallback to non-streaming
@@ -306,15 +314,19 @@ export class AgentOrchestrator extends EventEmitter {
 
   private async getAIResponseWithRetry(
     agent: Agent,
+    options?: {
+      extendedThinking?: boolean;
+      reasoningEffort?: 'low' | 'medium' | 'high';
+    },
     attempt: number = 1
   ): Promise<{ content: string; metadata?: Record<string, any> }> {
     try {
-      return await this.getAIResponse(agent);
+      return await this.getAIResponse(agent, options);
     } catch (error) {
       if (attempt < this.MAX_RETRIES && this.isRetryableError(error)) {
         log.warn(`Retrying AI request for agent ${agent.id}, attempt ${attempt + 1}/${this.MAX_RETRIES}`);
         await this.delay(this.RETRY_DELAY * attempt); // Exponential backoff
-        return this.getAIResponseWithRetry(agent, attempt + 1);
+        return this.getAIResponseWithRetry(agent, options, attempt + 1);
       }
       throw error;
     }
@@ -569,6 +581,8 @@ export class AgentOrchestrator extends EventEmitter {
     options?: {
       signal?: AbortSignal;
       onProgress?: (progress: number) => void;
+      extendedThinking?: boolean;
+      reasoningEffort?: 'low' | 'medium' | 'high';
     }
   ): Promise<{ content: string; metadata?: Record<string, any> }> {
     const provider = this.aiProviderManager.getProvider(agent.providerId);
@@ -576,30 +590,49 @@ export class AgentOrchestrator extends EventEmitter {
       throw new Error(`Provider ${agent.providerId} not found`);
     }
 
-    return await provider.sendMessage(agent.model, agent.messages, {
-      signal: options?.signal,
-      onProgress: options?.onProgress
-    });
+    return await provider.sendMessage(
+      agent.model, 
+      agent.messages.map(m => ({ role: m.role, content: m.content })) as Array<{ role: string; content: string }>, 
+      {
+        signal: options?.signal,
+        onProgress: options?.onProgress,
+        extendedThinking: options?.extendedThinking,
+        reasoningEffort: options?.reasoningEffort
+      }
+    );
   }
 
   private async parseAndApplyChanges(agent: Agent, content: string): Promise<CodeChange[]> {
     const changes: CodeChange[] = [];
     
-    // Parse code blocks and diff markers from response
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-    const diffRegex = /diff --git a\/(.+) b\/(.+)\n([\s\S]*?)(?=diff --git|$)/g;
+    const diffRegex = /diff --git a\/(.+?) b\/(.+?)\n([\s\S]*?)(?=\ndiff --git|$)/g;
     
     let match;
+    const worktreePath = agent.worktreeName 
+      ? path.join(agent.projectPath, '.git', 'worktrees', agent.worktreeName)
+      : agent.projectPath;
     
-    // Parse explicit diffs
     while ((match = diffRegex.exec(content)) !== null) {
       const [, oldFile, newFile, diffContent] = match;
+      const filePath = newFile.trim();
+      
+      let originalContent = '';
+      let newContent = '';
+      
+      try {
+        const fullFilePath = path.join(worktreePath, filePath);
+        originalContent = await fs.readFile(fullFilePath, 'utf-8');
+      } catch {
+        log.warn(`Could not read original file: ${filePath}, file may be new`);
+      }
+      
+      newContent = this.applyDiff(originalContent, diffContent);
       
       const change: CodeChange = {
         id: uuidv4(),
-        filePath: newFile,
-        originalContent: '', // Would need to read from worktree
-        newContent: '', // Would need to parse from diff
+        filePath,
+        originalContent,
+        newContent,
         diff: diffContent,
         agentId: agent.id,
         taskId: agent.tasks[agent.tasks.length - 1]?.id || '',
@@ -611,21 +644,136 @@ export class AgentOrchestrator extends EventEmitter {
       await this.dbManager.createCodeChange(change);
     }
 
-    // Apply changes to worktree
-    const worktreePath = path.join(agent.projectPath, '.git', 'worktrees', agent.worktreeName);
-    
     for (const change of changes) {
-      const filePath = path.join(worktreePath, change.filePath);
-      
-      // Ensure directory exists
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      
-      // Write new content (simplified - real implementation would parse diff)
-      // await fs.writeFile(filePath, change.newContent, 'utf-8');
-      
-      log.info(`Applied change to ${change.filePath} in worktree ${agent.worktreeName}`);
+      try {
+        const filePath = path.join(worktreePath, change.filePath);
+        
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        
+        await fs.writeFile(filePath, change.newContent, 'utf-8');
+        
+        log.info(`Applied change to ${change.filePath} in worktree ${agent.worktreeName}`);
+      } catch (error) {
+        log.error(`Failed to apply change to ${change.filePath}:`, error);
+      }
     }
 
     return changes;
+  }
+
+  private applyDiff(originalContent: string, diffContent: string): string {
+    const lines = diffContent.split('\n');
+    const result: string[] = [];
+    
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      
+      if (line.startsWith('@@')) {
+        const hunkHeader = line;
+        const match = hunkHeader.match(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
+        
+        if (match) {
+          const [, oldStart, oldCount, newStart, newCount] = match.map(Number);
+          const originalLines = originalContent.split('\n');
+          
+          const beforeContext = originalLines.slice(Math.max(0, oldStart - 2), oldStart - 1);
+          result.push(...beforeContext);
+          
+          i++;
+          
+          const hunkOldLines: string[] = [];
+          const hunkNewLines: string[] = [];
+          
+          while (i < lines.length && !lines[i].startsWith('@@') && !lines[i].startsWith('diff ')) {
+            if (lines[i].startsWith('-')) {
+              hunkOldLines.push(lines[i].substring(1));
+            } else if (lines[i].startsWith('+')) {
+              hunkNewLines.push(lines[i].substring(1));
+            } else if (!lines[i].startsWith('\\')) {
+              hunkOldLines.push(lines[i]);
+              hunkNewLines.push(lines[i]);
+            }
+            i++;
+          }
+          
+          result.push(...hunkNewLines);
+          
+          const afterContext = originalLines.slice(
+            oldStart - 1 + (oldCount || hunkOldLines.length),
+            oldStart - 1 + (oldCount || hunkOldLines.length) + 2
+          );
+          result.push(...afterContext);
+          
+          continue;
+        }
+      }
+      i++;
+    }
+    
+    if (result.length === 0 && diffContent.includes('new file')) {
+      const newFileMatch = diffContent.match(/\+\+\+ b\/(.+)/);
+      if (newFileMatch) {
+        const newLines: string[] = [];
+        for (const line of lines) {
+          if (line.startsWith('+') && !line.startsWith('+++')) {
+            newLines.push(line.substring(1));
+          } else if (line.startsWith(' ')) {
+            newLines.push(line.substring(1));
+          }
+        }
+        return newLines.join('\n');
+      }
+    }
+    
+    return result.join('\n');
+  }
+
+  // Permission Management
+  setAgentPermissionMode(agentId: string, mode: PermissionMode): void {
+    const agent = this.agents.get(agentId);
+    if (!agent) {
+      throw new Error(`Agent ${agentId} not found`);
+    }
+    
+    agent.permissionMode = mode;
+    this.permissionManager.setAgentMode(agentId, mode);
+    this.emit('agent:permissionModeChanged', { agentId, mode });
+    log.info(`Permission mode changed to ${mode} for agent ${agentId}`);
+  }
+
+  getAgentPermissionMode(agentId: string): PermissionMode {
+    return this.permissionManager.getAgentMode(agentId);
+  }
+
+  getPermissionManager(): PermissionManager {
+    return this.permissionManager;
+  }
+
+  setAllowBypassMode(allowed: boolean): void {
+    this.permissionManager.setAllowBypassMode(allowed);
+  }
+
+  isBypassModeAllowed(): boolean {
+    return this.permissionManager.isBypassAllowed();
+  }
+
+  async checkPermission(
+    agentId: string,
+    action: { type: 'edit' | 'command' | 'tool'; action: string; details: Record<string, any> }
+  ): Promise<{ allowed: boolean; requestId?: string }> {
+    return this.permissionManager.checkPermission(agentId, action);
+  }
+
+  async approvePermissionRequest(requestId: string): Promise<void> {
+    await this.permissionManager.approveRequest(requestId);
+  }
+
+  async rejectPermissionRequest(requestId: string): Promise<void> {
+    await this.permissionManager.rejectRequest(requestId);
+  }
+
+  getPendingPermissionRequests(agentId?: string): import('../../shared/types').PermissionRequest[] {
+    return this.permissionManager.getPendingRequests(agentId);
   }
 }

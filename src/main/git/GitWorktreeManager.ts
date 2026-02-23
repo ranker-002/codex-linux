@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import simpleGit, { SimpleGit } from 'simple-git';
 import log from 'electron-log';
-import { Worktree } from '../shared/types';
+import { Worktree } from '../../shared/types';
 
 export class GitWorktreeManager {
   private gitInstances: Map<string, SimpleGit> = new Map();
@@ -202,5 +202,10 @@ export class GitWorktreeManager {
       this.gitInstances.set(repoPath, git);
     }
     return this.gitInstances.get(repoPath)!;
+  }
+
+  async cleanup(): Promise<void> {
+    this.gitInstances.clear();
+    log.info('GitWorktreeManager cleanup completed');
   }
 }

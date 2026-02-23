@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Agent, AgentMessage } from '../shared/types';
+import { Agent, AgentMessage, AgentStatus, PermissionMode } from '../../shared/types';
 import { Send, Bot, User, Loader2, Paperclip, MoreVertical, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
+import { PermissionSelector } from './PermissionSelector';
 
 interface ChatInterfaceProps {
   agent: Agent;
   onSendMessage: (message: string) => Promise<void>;
   onExecuteTask: (task: string) => Promise<void>;
+  onPermissionModeChange?: (mode: PermissionMode) => void;
+  allowBypassMode?: boolean;
   isLoading?: boolean;
 }
 
@@ -14,6 +17,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   agent,
   onSendMessage,
   onExecuteTask,
+  onPermissionModeChange,
+  allowBypassMode = false,
   isLoading = false
 }) => {
   const [input, setInput] = useState('');
@@ -35,11 +40,34 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const message = input;
     setInput('');
     
-    // Check if it's a task command
+    // Check for slash commands
     if (message.startsWith('/task ')) {
       await onExecuteTask(message.slice(6));
+    } else if (message.startsWith('/search ')) {
+      // Handle search command
+      const searchQuery = message.slice(8);
+      await onSendMessage(`[SEARCH] ${searchQuery}`);
+    } else if (message.startsWith('/vision ') || message.startsWith('/analyze ')) {
+      // Handle vision command
+      const visionQuery = message.split(' ').slice(1).join(' ');
+      await onSendMessage(`[VISION] ${visionQuery}`);
     } else {
       await onSendMessage(message);
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (isLoading) return;
+    
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        await onSendMessage(`[IMAGE] ${base64}`);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Failed to upload image:', error);
     }
   };
 
@@ -111,7 +139,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const extractCodeBlocks = (content: string) => {
     const codeBlocks: { language: string; code: string }[] = [];
     const regex = /```(\w+)?\n([\s\S]*?)```/g;
-    let match;
+    let match: RegExpExecArray | null;
     while ((match = regex.exec(content)) !== null) {
       codeBlocks.push({
         language: match[1] || 'text',
@@ -137,7 +165,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             <p className="text-xs text-muted-foreground">{agent.model}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {onPermissionModeChange && (
+            <PermissionSelector
+              currentMode={agent.permissionMode}
+              onModeChange={onPermissionModeChange}
+              allowBypass={allowBypassMode}
+            />
+          )}
           <span className="text-xs text-muted-foreground">
             {agent.messages.length} messages
           </span>
@@ -159,24 +194,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onClick={() => setInput('Can you help me refactor this code?')}
                 className="block px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                "Can you help me refactor this code?"
+                &quot;Can you help me refactor this code?&quot;
               </button>
               <button 
                 onClick={() => setInput('/task Review all JavaScript files for potential bugs')}
                 className="block px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                "/task Review all JavaScript files..."
+                &quot;/task Review all JavaScript files...&quot;
               </button>
               <button 
                 onClick={() => setInput('Explain how this function works')}
                 className="block px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                "Explain how this function works"
+                &quot;Explain how this function works&quot;
               </button>
             </div>
           </div>
         ) : (
-          agent.messages.map((message, index) => (
+          agent.messages.map((message) => (
             <div
               key={message.id}
               className={`group flex gap-3 ${

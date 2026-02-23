@@ -1,8 +1,9 @@
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import Database from 'better-sqlite3';
 import log from 'electron-log';
-import { Agent, AgentMessage, AgentTask, CodeChange, Automation, Project } from '../shared/types';
+import { Agent, AgentMessage, AgentTask, CodeChange, Automation, Project, ChangeStatus } from '../shared/types';
 
 const DB_DIR = path.join(os.homedir(), '.config', 'codex');
 const DB_PATH = path.join(DB_DIR, 'codex.db');
@@ -406,7 +407,7 @@ export class DatabaseManager {
     if (!this.db) throw new Error('Database not initialized');
 
     let query = 'SELECT * FROM code_changes';
-    let params: any[] = [];
+    const params: any[] = [];
 
     if (agentId) {
       query += ' WHERE agent_id = ?';
@@ -552,5 +553,110 @@ export class DatabaseManager {
       tasks: [],
       metadata: row.metadata ? JSON.parse(row.metadata) : {}
     };
+  }
+
+  // Project operations
+  async createProject(project: Project): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare(`
+      INSERT INTO projects (id, name, path, git_remote, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      project.id,
+      project.name,
+      project.path,
+      project.gitRemote || null,
+      project.createdAt.getTime(),
+      project.updatedAt.getTime()
+    );
+  }
+
+  async updateProject(project: Project): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare(`
+      UPDATE projects SET
+        name = ?,
+        path = ?,
+        git_remote = ?,
+        updated_at = ?
+      WHERE id = ?
+    `);
+
+    stmt.run(
+      project.name,
+      project.path,
+      project.gitRemote || null,
+      project.updatedAt.getTime(),
+      project.id
+    );
+  }
+
+  async getProject(id: string): Promise<Project | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare('SELECT * FROM projects WHERE id = ?');
+    const row = stmt.get(id) as any;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      gitRemote: row.git_remote || undefined,
+      agents: [],
+      worktrees: [],
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at)
+    };
+  }
+
+  async getProjectByPath(projectPath: string): Promise<Project | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare('SELECT * FROM projects WHERE path = ?');
+    const row = stmt.get(projectPath) as any;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      gitRemote: row.git_remote || undefined,
+      agents: [],
+      worktrees: [],
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at)
+    };
+  }
+
+  async listProjects(): Promise<Project[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare('SELECT * FROM projects ORDER BY updated_at DESC');
+    const rows = stmt.all() as any[];
+
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      gitRemote: row.git_remote || undefined,
+      agents: [],
+      worktrees: [],
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at)
+    }));
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stmt = this.db.prepare('DELETE FROM projects WHERE id = ?');
+    stmt.run(id);
   }
 }

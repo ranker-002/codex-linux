@@ -1,17 +1,75 @@
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import * as cron from 'node-cron';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { app } from 'electron';
 import log from 'electron-log';
-import { Automation, AutomationTrigger, AutomationAction, Agent } from '../shared/types';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { Automation, AutomationTrigger, AutomationAction, Agent } from '../../shared/types';
+import { NotificationManager } from '../notifications/NotificationManager';
+
+const execAsync = promisify(exec);
+
+const AUTOMATIONS_FILE = 'automations.json';
 
 export class AutomationScheduler extends EventEmitter {
   private automations: Map<string, Automation> = new Map();
   private scheduledTasks: Map<string, cron.ScheduledTask> = new Map();
+  private notificationManager?: NotificationManager;
+  private dataDir: string;
+
+  constructor() {
+    super();
+    this.dataDir = path.join(app.getPath('userData'), 'data');
+  }
+
+  setNotificationManager(notificationManager: NotificationManager): void {
+    this.notificationManager = notificationManager;
+  }
 
   async initialize(): Promise<void> {
-    // Load automations from database
-    // For now, start empty
+    await this.loadAutomations();
     log.info('Automation scheduler initialized');
+  }
+
+  private async loadAutomations(): Promise<void> {
+    try {
+      await fs.mkdir(this.dataDir, { recursive: true });
+      const filePath = path.join(this.dataDir, AUTOMATIONS_FILE);
+      const data = await fs.readFile(filePath, 'utf-8');
+      const automations: Automation[] = JSON.parse(data);
+      
+      for (const automation of automations) {
+        automation.createdAt = new Date(automation.createdAt);
+        automation.updatedAt = new Date(automation.updatedAt);
+        if (automation.lastRunAt) {
+          automation.lastRunAt = new Date(automation.lastRunAt);
+        }
+        this.automations.set(automation.id, automation);
+        
+        if (automation.enabled) {
+          await this.scheduleAutomation(automation);
+        }
+      }
+      log.info(`Loaded ${automations.length} automations`);
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        log.error('Failed to load automations:', error);
+      }
+    }
+  }
+
+  private async saveAutomations(): Promise<void> {
+    try {
+      await fs.mkdir(this.dataDir, { recursive: true });
+      const filePath = path.join(this.dataDir, AUTOMATIONS_FILE);
+      const automations = Array.from(this.automations.values());
+      await fs.writeFile(filePath, JSON.stringify(automations, null, 2), 'utf-8');
+    } catch (error) {
+      log.error('Failed to save automations:', error);
+    }
   }
 
   async cleanup(): Promise<void> {
@@ -47,6 +105,7 @@ export class AutomationScheduler extends EventEmitter {
       await this.scheduleAutomation(automation);
     }
 
+    await this.saveAutomations();
     this.emit('automation:created', automation);
     log.info(`Created automation ${automation.id} (${automation.name})`);
 
@@ -69,6 +128,7 @@ export class AutomationScheduler extends EventEmitter {
       await this.scheduleAutomation(automation);
     }
 
+    await this.saveAutomations();
     this.emit('automation:updated', automation);
     return automation;
   }
@@ -82,6 +142,7 @@ export class AutomationScheduler extends EventEmitter {
     await this.unscheduleAutomation(automationId);
     this.automations.delete(automationId);
 
+    await this.saveAutomations();
     this.emit('automation:deleted', { automationId });
     log.info(`Deleted automation ${automationId}`);
   }
@@ -156,30 +217,54 @@ export class AutomationScheduler extends EventEmitter {
   }
 
   private async executeAction(action: AutomationAction): Promise<void> {
+    log.info(`Executing action: ${action.type}`, action.config);
+
     switch (action.type) {
       case 'createAgent':
-        // Would create agent through AgentOrchestrator
         this.emit('action:createAgent', action.config);
+        log.info(`Emitted createAgent event with config:`, action.config);
         break;
-      
+
       case 'sendMessage':
         this.emit('action:sendMessage', action.config);
+        log.info(`Emitted sendMessage event with config:`, action.config);
         break;
-      
-      case 'executeCommand':
-        // Would execute shell command
-        this.emit('action:executeCommand', action.config);
+
+      case 'executeCommand': {
+        const { command, cwd = process.cwd() } = action.config;
+        if (!command) {
+          throw new Error('Command is required for executeCommand action');
+        }
+        try {
+          const { stdout, stderr } = await execAsync(command, { cwd });
+          log.info(`Command executed successfully: ${command}`, { stdout, stderr });
+          this.emit('action:executeCommand:result', { success: true, stdout, stderr });
+        } catch (error: any) {
+          log.error(`Command execution failed: ${command}`, error.message);
+          this.emit('action:executeCommand:result', { success: false, error: error.message });
+        }
         break;
-      
+      }
+
       case 'runSkill':
         this.emit('action:runSkill', action.config);
+        log.info(`Emitted runSkill event with config:`, action.config);
         break;
-      
-      case 'notify':
-        // Would show notification
-        this.emit('action:notify', action.config);
+
+      case 'notify': {
+        const { title, body } = action.config;
+        if (!title || !body) {
+          throw new Error('Title and body are required for notify action');
+        }
+        if (this.notificationManager) {
+          this.notificationManager.show({ title, body });
+        } else {
+          this.emit('action:notify', { title, body });
+        }
+        log.info(`Notification shown: ${title}`);
         break;
-      
+      }
+
       default:
         log.warn(`Unknown action type: ${action.type}`);
     }

@@ -42,7 +42,7 @@ export class BackupManager {
   async createBackup(): Promise<BackupMetadata> {
     const timestamp = new Date();
     const backupId = `backup-${format(timestamp, 'yyyy-MM-dd-HHmmss')}`;
-    const backupPath = path.join(this.backupDir, `${backupId}.tar.gz`);
+    const backupPath = path.join(this.backupDir, `${backupId}.json.gz`);
 
     try {
       // List files to backup
@@ -84,7 +84,7 @@ export class BackupManager {
   }
 
   async restoreBackup(backupId: string): Promise<void> {
-    const backupPath = path.join(this.backupDir, `${backupId}.tar.gz`);
+    const backupPath = path.join(this.backupDir, `${backupId}.json.gz`);
     const metadataPath = path.join(this.backupDir, `${backupId}.json`);
 
     try {
@@ -136,7 +136,7 @@ export class BackupManager {
 
   async deleteBackup(backupId: string): Promise<void> {
     try {
-      const backupPath = path.join(this.backupDir, `${backupId}.tar.gz`);
+      const backupPath = path.join(this.backupDir, `${backupId}.json.gz`);
       const metadataPath = path.join(this.backupDir, `${backupId}.json`);
 
       await fs.unlink(backupPath).catch(() => {});
@@ -150,13 +150,13 @@ export class BackupManager {
   }
 
   async exportBackup(backupId: string, exportPath: string): Promise<void> {
-    const backupPath = path.join(this.backupDir, `${backupId}.tar.gz`);
+    const backupPath = path.join(this.backupDir, `${backupId}.json.gz`);
     await fs.copyFile(backupPath, exportPath);
   }
 
   async importBackup(importPath: string): Promise<BackupMetadata> {
     const filename = path.basename(importPath);
-    const backupId = filename.replace('.tar.gz', '');
+    const backupId = filename.replace('.json.gz', '');
     const backupPath = path.join(this.backupDir, filename);
 
     await fs.copyFile(importPath, backupPath);
@@ -205,8 +205,6 @@ export class BackupManager {
   }
 
   private async createArchive(files: string[], outputPath: string): Promise<void> {
-    // In a real implementation, use tar package
-    // For now, create a simple JSON backup
     const backup = {
       files: {} as Record<string, string>,
       timestamp: new Date().toISOString(),

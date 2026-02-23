@@ -2,6 +2,7 @@ import React from 'react';
 import { Agent } from '../shared/types';
 import { Bot, MoreVertical, Minus, Square, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { VoiceCommand } from './VoiceCommand';
 
 interface HeaderProps {
   activeTab: string;
@@ -11,6 +12,10 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ activeTab, agents, onSettingsClick }) => {
   const runningAgents = agents.filter(a => a.status === 'running').length;
+
+  const handleVoiceCommand = (transcript: string) => {
+    console.log('Voice command:', transcript);
+  };
 
   const getTitle = () => {
     switch (activeTab) {

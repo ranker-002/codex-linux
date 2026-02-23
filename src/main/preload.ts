@@ -28,11 +28,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: () => ipcRenderer.invoke('agent:list'),
     get: (agentId: string) => ipcRenderer.invoke('agent:get', agentId),
     sendMessage: (agentId: string, message: string) => ipcRenderer.invoke('agent:sendMessage', agentId, message),
+    sendMessageStream: (agentId: string, message: string) => ipcRenderer.invoke('agent:sendMessageStream', agentId, message),
     executeTask: (agentId: string, task: string) => ipcRenderer.invoke('agent:executeTask', agentId, task),
     pause: (agentId: string) => ipcRenderer.invoke('agent:pause', agentId),
     resume: (agentId: string) => ipcRenderer.invoke('agent:resume', agentId),
     stop: (agentId: string) => ipcRenderer.invoke('agent:stop', agentId),
     delete: (agentId: string) => ipcRenderer.invoke('agent:delete', agentId),
+  },
+
+  // Cowork operations
+  cowork: {
+    create: (name: string, objective: string, projectPath: string, options?: any) => ipcRenderer.invoke('cowork:create', name, objective, projectPath, options),
+    start: (sessionId: string) => ipcRenderer.invoke('cowork:start', sessionId),
+    pause: (sessionId: string) => ipcRenderer.invoke('cowork:pause', sessionId),
+    stop: (sessionId: string) => ipcRenderer.invoke('cowork:stop', sessionId),
+    list: () => ipcRenderer.invoke('cowork:list'),
+  },
+
+  // Pair programming operations
+  pair: {
+    start: (projectPath: string, mode: string, userId: string) => ipcRenderer.invoke('pair:start', projectPath, mode, userId),
+    chat: (sessionId: string, message: string) => ipcRenderer.invoke('pair:chat', sessionId, message),
+    end: (sessionId: string) => ipcRenderer.invoke('pair:end', sessionId),
+  },
+
+  // Smart code assistant
+  assistant: {
+    inlineCompletion: (filePath: string, content: string, position: any) => ipcRenderer.invoke('assistant:inlineCompletion', filePath, content, position),
+    suggestFixes: (filePath: string, content: string) => ipcRenderer.invoke('assistant:suggestFixes', filePath, content),
+    explain: (code: string) => ipcRenderer.invoke('assistant:explain', code),
+  },
+
+  // Metrics operations
+  metrics: {
+    get: () => ipcRenderer.invoke('metrics:get'),
+    export: () => ipcRenderer.invoke('metrics:export'),
   },
 
   // Worktree operations
@@ -129,6 +159,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent:status',
       'agent:progress',
       'agent:error',
+      'agent:streamChunk',
+      'agent:streamEnd',
+      'agent:streamError',
       'automation:triggered',
       'worktree:changed',
       'skill:applied',

@@ -4,9 +4,9 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { AgentOrchestrator } from './agents/AgentOrchestrator';
-import { SecurityManager } from './security/SecurityManager';
-import { AuditLogger } from './security/AuditLogger';
+import { AgentOrchestrator } from '../agents/AgentOrchestrator';
+import { SecurityManager } from '../security/SecurityManager';
+import { AuditLogger } from '../security/AuditLogger';
 import log from 'electron-log';
 
 export class APIServer {

@@ -236,6 +236,7 @@ async function initializeServices(): Promise<void> {
 
     // Initialize automation scheduler
     automationScheduler = new AutomationScheduler();
+    automationScheduler.setNotificationManager(notificationManager);
     await automationScheduler.initialize();
     log.info('Automation scheduler initialized');
 
@@ -289,8 +290,7 @@ async function initializeServices(): Promise<void> {
     await auditLogger.initialize();
     log.info('Audit logger initialized');
 
-    // Initialize error tracker
-    const sentryDsn = (settingsManager as any).get('sentryDsn') as string | undefined;
+    const sentryDsn = settingsManager.get('sentryDsn');
     if (sentryDsn) {
       errorTracker = new ErrorTracker();
       errorTracker.initialize(sentryDsn);
@@ -311,7 +311,7 @@ async function initializeServices(): Promise<void> {
     log.info('API server started on port 3001');
 
     // Initialize GitHub PR Monitor if token available
-    const githubToken = (settingsManager as any).get('githubToken') as string | undefined;
+    const githubToken = settingsManager.get('githubToken');
     if (githubToken) {
       githubPRMonitor = new GitHubPRMonitor(
         githubToken,
@@ -521,7 +521,7 @@ function setupIPC(): void {
   ipcMain.handle('agent:create', async (event, config) => {
     try {
       const validatedConfig = AgentConfigSchema.parse(config);
-      const result = await agentOrchestrator.createAgent(validatedConfig);
+      const result = await agentOrchestrator.createAgent(validatedConfig as any);
       await auditLogger.log('agent_created', { agentId: result.id });
       return result;
     } catch (error) {
@@ -656,11 +656,11 @@ function setupIPC(): void {
 
   // Settings operations
   ipcMain.handle('settings:get', (event, key: string) => {
-    return (settingsManager as any).get(key);
+    return settingsManager.getAny(key);
   });
 
   ipcMain.handle('settings:set', (event, key: string, value: any) => {
-    (settingsManager as any).set(key, value);
+    settingsManager.setAny(key, value);
   });
 
   ipcMain.handle('settings:getAll', () => {
@@ -714,6 +714,12 @@ function setupIPC(): void {
   });
 
   ipcMain.handle('fs:writeFile', async (event, filePath: string, content: string) => {
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error('File path is required');
+    }
+    if (filePath.includes('..')) {
+      throw new Error('Path traversal not allowed');
+    }
     try {
       await fs.writeFile(filePath, content, 'utf-8');
     } catch (error) {
@@ -742,6 +748,13 @@ function setupIPC(): void {
   let currentTerminalProcess: ChildProcess | null = null;
 
   ipcMain.handle('terminal:execute', async (event, { command, cwd }: { command: string; cwd: string }) => {
+    if (!command || typeof command !== 'string') {
+      throw new Error('Command is required');
+    }
+    if (!cwd || typeof cwd !== 'string') {
+      throw new Error('CWD is required');
+    }
+    
     return new Promise((resolve) => {
       const [cmd, ...args] = command.split(' ');
       
@@ -920,7 +933,7 @@ function setupIPC(): void {
       
       if (data.settings) {
         for (const [key, value] of Object.entries(data.settings)) {
-          settingsManager.set(key as any, value);
+          settingsManager.setAny(key, value);
         }
       }
       
@@ -954,7 +967,9 @@ function setupIPC(): void {
 
   // Pair programming operations
   ipcMain.handle('pair:start', async (event, projectPath: string, mode: string, userId: string) => {
-    return await aiPairProgramming.startSession(projectPath, mode as any, userId);
+    const validModes = ['collaborative', 'teacher', 'reviewer'];
+    const validMode = validModes.includes(mode) ? mode as 'collaborative' | 'teacher' | 'reviewer' : 'collaborative';
+    return await aiPairProgramming.startSession(projectPath, validMode, userId);
   });
 
   ipcMain.handle('pair:chat', async (event, sessionId: string, message: string) => {

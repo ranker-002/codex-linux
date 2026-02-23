@@ -21,9 +21,58 @@ function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [activeTab, setActiveTab] = useState('agents');
   const [isLoading, setIsLoading] = useState(true);
+  const [streamingContent, setStreamingContent] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadInitialData();
+
+    const handleStreamChunk = ({ agentId, chunk }: { agentId: string; chunk: string }) => {
+      setStreamingContent(prev => ({
+        ...prev,
+        [agentId]: (prev[agentId] || '') + chunk
+      }));
+    };
+
+    const handleStreamEnd = ({ agentId }: { agentId: string }) => {
+      setAgents(prev => prev.map(agent => {
+        if (agent.id === agentId && streamingContent[agentId]) {
+          return {
+            ...agent,
+            messages: [...agent.messages, {
+              id: Date.now().toString(),
+              role: 'assistant',
+              content: streamingContent[agentId],
+              timestamp: new Date()
+            }]
+          };
+        }
+        return agent;
+      }));
+      setStreamingContent(prev => {
+        const newContent = { ...prev };
+        delete newContent[agentId];
+        return newContent;
+      });
+    };
+
+    const handleStreamError = ({ agentId, error }: { agentId: string; error: string }) => {
+      console.error(`Stream error for agent ${agentId}:`, error);
+      setStreamingContent(prev => {
+        const newContent = { ...prev };
+        delete newContent[agentId];
+        return newContent;
+      });
+    };
+
+    window.electronAPI.on('agent:streamChunk', handleStreamChunk);
+    window.electronAPI.on('agent:streamEnd', handleStreamEnd);
+    window.electronAPI.on('agent:streamError', handleStreamError);
+
+    return () => {
+      window.electronAPI.removeListener('agent:streamChunk', handleStreamChunk);
+      window.electronAPI.removeListener('agent:streamEnd', handleStreamEnd);
+      window.electronAPI.removeListener('agent:streamError', handleStreamError);
+    };
   }, []);
 
   const loadInitialData = async () => {

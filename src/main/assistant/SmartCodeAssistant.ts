@@ -60,13 +60,13 @@ Cursor position: column ${position.column}
 
 Provide ONLY the completion text that should be inserted at the cursor. Be concise and context-aware.`;
 
-      const provider = this.aiProviderManager.getActiveProvider();
+      const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return null;
 
       const response = await provider.sendMessage('gpt-4o-mini', [
         { role: 'system', content: 'You are a code completion assistant. Provide only the code completion, no explanations.' },
         { role: 'user', content: prompt },
-      ]);
+      ] as Array<{ role: string; content: string }>);
 
       const completion = response.content.trim();
       
@@ -103,13 +103,13 @@ Identify:
 
 Return a JSON array of suggestions with: type, line, description, and suggested code fix.`;
 
-      const provider = this.aiProviderManager.getActiveProvider();
+      const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return suggestions;
 
       const response = await provider.sendMessage('gpt-4o', [
         { role: 'system', content: 'You are a code reviewer. Provide suggestions in JSON format.' },
         { role: 'user', content: prompt },
-      ]);
+      ] as Array<{ role: string; content: string }>);
 
       // Parse JSON response
       try {
@@ -162,13 +162,13 @@ Provide:
 4. Usage examples
 5. Any important notes or warnings`;
 
-      const provider = this.aiProviderManager.getActiveProvider();
+      const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return '';
 
       const response = await provider.sendMessage('gpt-4o', [
         { role: 'system', content: 'You are a technical documentation writer.' },
         { role: 'user', content: prompt },
-      ]);
+      ] as Array<{ role: string; content: string }>);
 
       return response.content;
     } catch (error) {
@@ -187,7 +187,7 @@ ${code}
 
 ${detailLevel === 'simple' ? 'Explain it simply for a beginner.' : 'Provide a detailed technical explanation.'}`;
 
-      const provider = this.aiProviderManager.getActiveProvider();
+      const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return '';
 
       const response = await provider.sendMessage('gpt-4o', [
@@ -217,13 +217,13 @@ ${code}
 
 Provide the refactored code with explanations of what changed and why.`;
 
-      const provider = this.aiProviderManager.getActiveProvider();
+      const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return '';
 
       const response = await provider.sendMessage('gpt-4o', [
         { role: 'system', content: 'You are an expert code refactorer.' },
         { role: 'user', content: prompt },
-      ]);
+      ] as Array<{ role: string; content: string }>);
 
       return response.content;
     } catch (error) {

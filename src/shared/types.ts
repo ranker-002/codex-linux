@@ -1,3 +1,42 @@
+export enum PermissionMode {
+  ASK = 'ask',
+  AUTO_ACCEPT_EDITS = 'auto_accept_edits',
+  PLAN = 'plan',
+  BYPASS = 'bypass'
+}
+
+export interface ExtendedThinkingConfig {
+  enabled: boolean;
+  maxTokens: number;
+  budgetTokens?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
+}
+
+export interface AgentMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  timestamp: Date;
+  metadata?: {
+    reasoning?: string;
+    extendedThinking?: boolean;
+    reasoningEffort?: 'low' | 'medium' | 'high';
+    tokensUsed?: number;
+    [key: string]: any;
+  };
+}
+
+export interface PermissionRequest {
+  id: string;
+  agentId: string;
+  type: 'edit' | 'command' | 'tool';
+  action: string;
+  details: Record<string, any>;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: Date;
+  resolvedAt?: Date;
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -7,12 +46,14 @@ export interface Agent {
   providerId: string;
   model: string;
   skills: string[];
+  permissionMode: PermissionMode;
   createdAt: Date;
   updatedAt: Date;
   lastActiveAt: Date | null;
   messages: AgentMessage[];
   tasks: AgentTask[];
   metadata: Record<string, any>;
+  version?: number;
 }
 
 export enum AgentStatus {
@@ -28,7 +69,13 @@ export interface AgentMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: Date;
-  metadata?: Record<string, any>;
+  metadata?: {
+    reasoning?: string;
+    extendedThinking?: boolean;
+    reasoningEffort?: 'low' | 'medium' | 'high';
+    tokensUsed?: number;
+    [key: string]: any;
+  };
 }
 
 export interface AgentTask {
@@ -167,6 +214,8 @@ export interface Settings {
   shortcuts: Record<string, string>;
   sentryDsn?: string;
   githubToken?: string;
+  extendedThinking?: ExtendedThinkingConfig;
+  allowBypassMode?: boolean;
 }
 
 export interface CodeChange {

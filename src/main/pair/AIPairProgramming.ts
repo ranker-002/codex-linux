@@ -1,10 +1,10 @@
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import log from 'electron-log';
-import { AgentOrchestrator } from './agents/AgentOrchestrator';
-import { AIProviderManager } from './providers/AIProviderManager';
-import { SmartCodeAssistant } from './assistant/SmartCodeAssistant';
-import { Agent, AgentMessage } from '../shared/types';
+import { AgentOrchestrator } from '../agents/AgentOrchestrator';
+import { AIProviderManager } from '../providers/AIProviderManager';
+import { SmartCodeAssistant } from '../assistant/SmartCodeAssistant';
+import { Agent, AgentMessage } from '../../shared/types';
 
 interface PairSession {
   id: string;
@@ -139,13 +139,13 @@ Current file: ${session.context.currentFile}
 
 As a ${session.mode} pair programmer, provide a brief, helpful suggestion or insight. Keep it concise (1-2 sentences).`;
 
-      const provider = this.aiProviderManager.getActiveProvider();
+      const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return;
 
       const response = await provider.sendMessage('gpt-4o-mini', [
         { role: 'system', content: 'You are a helpful pair programmer.' },
         { role: 'user', content: prompt },
-      ]);
+      ] as Array<{ role: string; content: string }>);
 
       const suggestion = {
         id: uuidv4(),

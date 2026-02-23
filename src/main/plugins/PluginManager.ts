@@ -47,7 +47,7 @@ export interface PluginContext {
   emit: (event: string, ...args: any[]) => void;
   getConfig: (key: string) => any;
   setConfig: (key: string, value: any) => void;
-  log: typeof log;
+  log: ReturnType<typeof log.scope>;
 }
 
 export interface LoadedPlugin {

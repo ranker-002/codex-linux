@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS: Settings = {
     'skills:open': 'Ctrl+Shift+S',
     'automation:open': 'Ctrl+Shift+A',
     'settings:open': 'Ctrl+,',
-    'command:pallete': 'Ctrl+Shift+P'
+    'command:palette': 'Ctrl+Shift+P'
   }
 };
 
@@ -37,13 +37,23 @@ export class SettingsManager {
     this.store.set(key as string, value);
   }
 
+  getAny(key: string): any {
+    return this.store.get(key);
+  }
+
+  setAny(key: string, value: any): void {
+    this.store.set(key, value);
+  }
+
   getAll(): Settings {
     const settings = { ...DEFAULT_SETTINGS };
-    
-    for (const key of Object.keys(DEFAULT_SETTINGS) as Array<keyof Settings>) {
-      settings[key] = this.get(key);
+    const keys = Object.keys(DEFAULT_SETTINGS) as Array<keyof Settings>;
+    for (const key of keys) {
+      const value = this.store.get(key as string);
+      if (value !== undefined) {
+        (settings as any)[key] = value;
+      }
     }
-    
     return settings;
   }
 
