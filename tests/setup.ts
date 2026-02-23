@@ -1,9 +1,7 @@
 // Test setup and utilities
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const { jest } = global as any;
 
 // Mock electron modules
-(global as any).jest.mock('electron', () => ({
+jest.mock('electron', () => ({
   app: {
     getPath: () => '/tmp/test',
     on: () => {},
@@ -25,14 +23,14 @@ const { jest } = global as any;
   Notification: () => {},
 }));
 
-(global as any).jest.mock('electron-log', () => ({
+jest.mock('electron-log', () => ({
   info: () => {},
   error: () => {},
   warn: () => {},
   debug: () => {},
 }));
 
-(global as any).jest.mock('electron-store', () => {
+jest.mock('electron-store', () => {
   return () => ({
     get: () => {},
     set: () => {},

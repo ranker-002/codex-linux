@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Skill } from '../shared/types';
+import { Skill } from '../../shared/types';
 import { Wrench, Plus, FileText, Tag, Trash2, Edit2 } from 'lucide-react';
 
 interface SkillsPanelProps {

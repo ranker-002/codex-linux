@@ -250,6 +250,48 @@ async function initializeServices(): Promise<void> {
     await agentOrchestrator.initialize();
     log.info('Agent orchestrator initialized');
 
+    agentOrchestrator.on('changes:created', (payload: { agentId: string; changeId: string }) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('changes:created', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:taskCompleted', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:taskCompleted', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:taskStarted', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:taskStarted', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:taskFailed', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:taskFailed', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:paused', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:paused', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:resumed', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:resumed', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:stopped', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:stopped', payload);
+      }
+    });
+
     // Initialize backup manager
     backupManager = new BackupManager();
     await backupManager.initialize();
@@ -821,6 +863,48 @@ function setupIPC(): void {
     return await dbManager.applyCodeChange(changeId);
   });
 
+  // Checkpoints operations
+  ipcMain.handle('checkpoints:list', async (event, agentId?: string) => {
+    return await dbManager.listCheckpoints(agentId);
+  });
+
+  ipcMain.handle('checkpoints:restore', async (event, checkpointId: string) => {
+    return await dbManager.restoreCheckpoint(checkpointId);
+  });
+
+  ipcMain.handle('checkpoints:restoreLast', async (event, agentId: string) => {
+    return await dbManager.restoreLastCheckpoint(agentId);
+  });
+
+  // Agent queue operations
+  ipcMain.handle('queue:list', async (event, agentId: string) => {
+    return await dbManager.listAgentQueueItems(agentId);
+  });
+
+  ipcMain.handle('queue:enqueue', async (event, agentId: string, type: 'message' | 'task', content: string) => {
+    return await dbManager.enqueueAgentQueueItem(agentId, type, content);
+  });
+
+  ipcMain.handle('queue:delete', async (event, agentId: string, itemId: string) => {
+    return await dbManager.deleteAgentQueueItem(agentId, itemId);
+  });
+
+  ipcMain.handle('queue:moveUp', async (event, agentId: string, itemId: string) => {
+    return await dbManager.moveAgentQueueItemUp(agentId, itemId);
+  });
+
+  ipcMain.handle('queue:claimNext', async (event, agentId: string) => {
+    return await dbManager.claimNextAgentQueueItem(agentId);
+  });
+
+  ipcMain.handle('queue:complete', async (event, agentId: string, itemId: string, outcome: 'completed' | 'failed', error?: string) => {
+    return await dbManager.completeAgentQueueItem(agentId, itemId, outcome, error);
+  });
+
+  ipcMain.handle('queue:history', async (event, agentId: string, limit?: number) => {
+    return await dbManager.getQueueHistory(agentId, limit);
+  });
+
   // Git operations
   ipcMain.handle('git:status', async (event, repoPath: string) => {
     return await gitWorktreeManager.getChanges(repoPath);
@@ -884,7 +968,19 @@ function setupIPC(): void {
     }
   });
 
-  // Notifications
+  // Audit log operations
+  ipcMain.handle('audit:recent', async (event, limit: number = 100) => {
+    return await auditLogger.getRecentEvents(limit);
+  });
+
+  ipcMain.handle('audit:byAction', async (event, action: string, limit: number = 100) => {
+    return await auditLogger.getEventsByAction(action, limit);
+  });
+
+  ipcMain.handle('audit:export', async (event, exportPath: string) => {
+    await auditLogger.exportLogs(exportPath);
+    return { success: true };
+  });
   ipcMain.handle('notification:show', (event, { title, body }: { title: string; body: string }) => {
     if (Notification.isSupported()) {
       new Notification({

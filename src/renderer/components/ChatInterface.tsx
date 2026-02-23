@@ -23,6 +23,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedAutoContext, setExpandedAutoContext] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -82,6 +83,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     await navigator.clipboard.writeText(text);
     setCopiedId(messageId);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const getAutoContext = (message: AgentMessage): null | { files: Array<{ path: string; reason: string }>; totalChars?: number } => {
+    const raw = (message as any)?.metadata?.autoContext;
+    if (!raw || typeof raw !== 'object') return null;
+    const files = Array.isArray(raw.files) ? raw.files : [];
+    return {
+      files: files
+        .filter((f: any) => f && typeof f.path === 'string')
+        .map((f: any) => ({ path: String(f.path), reason: String(f.reason || '') })),
+      totalChars: typeof raw.totalChars === 'number' ? raw.totalChars : undefined
+    };
   };
 
   const renderMessageContent = (content: string) => {
@@ -258,16 +271,45 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                   {/* Message content */}
                   <div className="prose prose-sm dark:prose-invert max-w-none pr-8">
+                    {message.role === 'assistant' && (() => {
+                      const ac = getAutoContext(message);
+                      if (!ac || ac.files.length === 0) return null;
+                      const isExpanded = Boolean(expandedAutoContext[message.id]);
+                      return (
+                        <div className="mb-3">
+                          <button
+                            onClick={() => setExpandedAutoContext(prev => ({ ...prev, [message.id]: !isExpanded }))}
+                            className="text-xs px-2 py-1 rounded-md bg-background/60 hover:bg-background/80 border border-border text-muted-foreground"
+                            type="button"
+                          >
+                            Auto-context: {ac.files.length} files{typeof ac.totalChars === 'number' ? ` • ${ac.totalChars} chars` : ''}
+                            {isExpanded ? ' (hide)' : ' (show)'}
+                          </button>
+
+                          {isExpanded && (
+                            <div className="mt-2 rounded-md border border-border bg-background/50 p-2 text-xs">
+                              <div className="space-y-1">
+                                {ac.files.map((f, idx) => (
+                                  <div key={`${message.id}-ac-${idx}`} className="flex gap-2">
+                                    <span className="font-mono text-foreground truncate max-w-[260px]">{f.path}</span>
+                                    <span className="text-muted-foreground">— {f.reason}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {renderMessageContent(message.content)}
                   </div>
 
                   {/* Code blocks */}
                   {extractCodeBlocks(message.content).map((block, idx) => (
-                    <div key={idx} className="mt-3 relative group/code">
-                      <div className="flex items-center justify-between px-3 py-1.5 bg-background/50 rounded-t-lg border-b border-border">
-                        <span className="text-xs text-muted-foreground font-mono">
-                          {block.language}
-                        </span>
+                    <div key={idx} className="mt-4 rounded-lg overflow-hidden border border-border">
+                      <div className="flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border">
+                        <span className="text-xs font-medium text-muted-foreground">{block.language}</span>
                         <button
                           onClick={() => copyToClipboard(block.code, `code-${idx}`)}
                           className="p-1 hover:bg-background rounded"
@@ -280,9 +322,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         </button>
                       </div>
                       <pre className="bg-black/50 p-3 rounded-b-lg overflow-x-auto">
-                        <code className="text-sm font-mono text-green-400">
-                          {block.code}
-                        </code>
+                        <code className="text-sm font-mono text-green-400">{block.code}</code>
                       </pre>
                     </div>
                   ))}

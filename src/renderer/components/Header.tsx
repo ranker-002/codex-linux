@@ -1,5 +1,5 @@
 import React from 'react';
-import { Agent } from '../shared/types';
+import { Agent } from '../../shared/types';
 import { Bot, MoreVertical, Minus, Square, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VoiceCommand } from './VoiceCommand';
