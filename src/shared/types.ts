@@ -639,3 +639,77 @@ export interface AudioStream {
   sampleRate: number;
   channels: number;
 }
+
+// Agent SDK Types
+export interface AgentDefinition {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  author?: string;
+  model?: string;
+  provider?: string;
+  systemPrompt?: string;
+  tools?: string[];
+  skills?: string[];
+  guardrails?: AgentGuardrail[];
+}
+
+export interface AgentGuardrail {
+  type: 'input_filter' | 'output_filter' | 'tool_restriction';
+  config: Record<string, any>;
+  enabled: boolean;
+}
+
+export interface AgentExecutionContext {
+  agentId: string;
+  sessionId: string;
+  messages: AgentMessage[];
+  metadata: Record<string, any>;
+}
+
+export interface AgentHandler {
+  name: string;
+  description: string;
+  parameters?: Record<string, any>;
+  execute: (context: AgentExecutionContext, params: any) => Promise<any>;
+}
+
+// Slash Commands Types
+export interface SlashCommand {
+  id: string;
+  name: string;
+  description: string;
+  usage: string;
+  aliases?: string[];
+  execute: (args: string, context: any) => Promise<SlashCommandResult>;
+}
+
+export interface SlashCommandResult {
+  success: boolean;
+  message?: string;
+  output?: any;
+  error?: string;
+}
+
+// Hook Types
+export interface Hook {
+  id: string;
+  name: string;
+  trigger: 'pre' | 'post';
+  event: string;
+  command: string;
+  enabled: boolean;
+  timeout?: number;
+}
+
+export interface HookExecution {
+  hookId: string;
+  event: string;
+  trigger: 'pre' | 'post';
+  startTime: Date;
+  endTime?: Date;
+  success: boolean;
+  output?: string;
+  error?: string;
+}
