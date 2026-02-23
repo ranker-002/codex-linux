@@ -250,3 +250,125 @@ export interface Project {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Computer Using Agent (CUA) Types
+export interface UIElement {
+  id?: string;
+  type: 'button' | 'input' | 'link' | 'text' | 'image' | 'container' | 'other';
+  text?: string;
+  coordinates: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  confidence: number;
+  attributes?: Record<string, string>;
+}
+
+export interface ComputerAction {
+  type: 'click' | 'doubleClick' | 'rightClick' | 'type' | 'scroll' | 'drag' | 'wait' | 'key' | 'screenshot';
+  target?: {
+    element?: UIElement;
+    coordinates?: { x: number; y: number };
+    selector?: string;
+  };
+  value?: string;
+  delay?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface ComputerTask {
+  id: string;
+  description: string;
+  goal: string;
+  maxSteps: number;
+  currentStep: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  actions: ComputerAction[];
+  results: string[];
+  error?: string;
+}
+
+export interface ComputerUseSession {
+  id: string;
+  taskId: string;
+  startTime: Date;
+  endTime?: Date;
+  screenshots: string[];
+  actions: ComputerAction[];
+  currentUrl?: string;
+  currentApp?: string;
+}
+
+// CLAUDE.md Configuration Types
+export interface ClaudeMdConfig {
+  version: string;
+  project: {
+    name: string;
+    description?: string;
+    language?: string;
+    framework?: string;
+  };
+  codingStandards: {
+    style?: string;
+    linter?: string;
+    formatter?: string;
+    maxLineLength?: number;
+    indentSize?: number;
+    useTabs?: boolean;
+  };
+  architecture: {
+    patterns?: string[];
+    conventions?: string[];
+    folderStructure?: string;
+    designPrinciples?: string[];
+  };
+  libraries: {
+    preferred?: string[];
+    avoid?: string[];
+    testing?: string[];
+    utilities?: string[];
+  };
+  reviewChecklist: {
+    required?: string[];
+    recommended?: string[];
+    security?: string[];
+    performance?: string[];
+  };
+  tools: {
+    build?: string;
+    test?: string;
+    lint?: string;
+    typecheck?: string;
+  };
+  customPrompts: {
+    systemPrompt?: string;
+    beforeAction?: string;
+    afterAction?: string;
+    commitMessage?: string;
+    prDescription?: string;
+  };
+  agents?: {
+    defaultModel?: string;
+    defaultProvider?: string;
+    skills?: string[];
+    permissionMode?: PermissionMode;
+  };
+  mcp?: {
+    servers?: Array<{
+      name: string;
+      command?: string;
+      url?: string;
+      env?: Record<string, string>;
+    }>;
+  };
+  hooks?: {
+    preEdit?: string;
+    postEdit?: string;
+    preCommit?: string;
+    postCommit?: string;
+  };
+  ignore?: string[];
+  metadata?: Record<string, any>;
+}

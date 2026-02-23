@@ -3,12 +3,13 @@ import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import log from 'electron-log';
-import { Agent, AgentStatus, AgentMessage, AgentTask, TaskStatus, CodeChange, ChangeStatus, PermissionMode } from '../../shared/types';
+import { Agent, AgentStatus, AgentMessage, AgentTask, TaskStatus, CodeChange, ChangeStatus, PermissionMode, ClaudeMdConfig } from '../../shared/types';
 import { GitWorktreeManager } from '../git/GitWorktreeManager';
 import { SkillsManager } from '../skills/SkillsManager';
 import { DatabaseManager } from '../DatabaseManager';
 import { AIProviderManager } from '../providers/AIProviderManager';
 import { PermissionManager } from '../security/PermissionManager';
+import { ClaudeMdParser } from '../config/ClaudeMdParser';
 
 interface AgentConfig {
   name: string;
@@ -125,30 +126,51 @@ export class AgentOrchestrator extends EventEmitter {
     // Create worktree for isolation
     await this.gitWorktreeManager.createWorktree(config.projectPath, worktreeName);
     
+    // Load CLAUDE.md configuration
+    const claudeMdParser = new ClaudeMdParser();
+    const claudeMdConfig = await claudeMdParser.load(config.projectPath);
+    
+    // Merge CLAUDE.md config with provided config
+    const mergedConfig: AgentConfig = {
+      ...config,
+      // Override with CLAUDE.md agent settings if present
+      model: claudeMdConfig?.agents?.defaultModel || config.model,
+      providerId: claudeMdConfig?.agents?.defaultProvider || config.providerId,
+      skills: [...(config.skills || []), ...(claudeMdConfig?.agents?.skills || [])],
+      systemPrompt: this.buildSystemPrompt(config.systemPrompt, claudeMdConfig)
+    };
+    
     const agent: Agent = {
       id: agentId,
-      name: config.name,
+      name: mergedConfig.name,
       status: AgentStatus.IDLE,
-      projectPath: config.projectPath,
+      projectPath: mergedConfig.projectPath,
       worktreeName,
-      providerId: config.providerId,
-      model: config.model,
-      skills: config.skills || [],
-      permissionMode: this.permissionManager.getDefaultMode(),
+      providerId: mergedConfig.providerId,
+      model: mergedConfig.model,
+      skills: mergedConfig.skills || [],
+      permissionMode: claudeMdConfig?.agents?.permissionMode || this.permissionManager.getDefaultMode(),
       createdAt: new Date(),
       updatedAt: new Date(),
       lastActiveAt: null,
       messages: [],
       tasks: [],
-      metadata: config.metadata || {}
+      metadata: {
+        ...mergedConfig.metadata,
+        claudeMdConfig: claudeMdConfig ? {
+          version: claudeMdConfig.version,
+          projectName: claudeMdConfig.project?.name,
+          loadedAt: new Date().toISOString()
+        } : undefined
+      }
     };
 
     // Add system message if provided
-    if (config.systemPrompt) {
+    if (mergedConfig.systemPrompt) {
       agent.messages.push({
         id: uuidv4(),
         role: 'system',
-        content: config.systemPrompt,
+        content: mergedConfig.systemPrompt,
         timestamp: new Date()
       });
     }
@@ -775,5 +797,25 @@ export class AgentOrchestrator extends EventEmitter {
 
   getPendingPermissionRequests(agentId?: string): import('../../shared/types').PermissionRequest[] {
     return this.permissionManager.getPendingRequests(agentId);
+  }
+
+  private buildSystemPrompt(userPrompt?: string, claudeMdConfig?: ClaudeMdConfig | null): string {
+    const parts: string[] = [];
+
+    if (claudeMdConfig) {
+      const parser = new ClaudeMdParser();
+      // Temporarily set config to generate prompt
+      (parser as any).config = claudeMdConfig;
+      const claudePrompt = parser.generateSystemPrompt();
+      if (claudePrompt) {
+        parts.push(claudePrompt);
+      }
+    }
+
+    if (userPrompt) {
+      parts.push(userPrompt);
+    }
+
+    return parts.join('\n\n');
   }
 }
