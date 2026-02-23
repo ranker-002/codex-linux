@@ -372,3 +372,114 @@ export interface ClaudeMdConfig {
   ignore?: string[];
   metadata?: Record<string, any>;
 }
+
+// MCP Advanced Types
+export type MCPTransportType = 'stdio' | 'http' | 'streamable-http' | 'sse' | 'websocket';
+export type MCPScope = 'local' | 'project' | 'user' | 'managed';
+
+export interface MCPServerDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  transport: MCPTransportType;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  oauth?: {
+    clientId?: string;
+    clientSecret?: string;
+    callbackPort?: number;
+  };
+  scope: MCPScope;
+  disabled?: boolean;
+  metadata?: {
+    category?: string;
+    tags?: string[];
+    author?: string;
+    version?: string;
+    homepage?: string;
+  };
+}
+
+export interface MCPRegistryEntry {
+  id: string;
+  name: string;
+  description: string;
+  publisher: string;
+  version: string;
+  transport: MCPTransportType[];
+  categories: string[];
+  tags: string[];
+  installs: number;
+  rating: number;
+  documentation?: string;
+  repository?: string;
+  command?: string;
+  packages?: Array<{
+    registryType: 'npm' | 'pip' | 'docker';
+    identifier: string;
+  }>;
+  remotes?: Array<{
+    type: 'streamable-http' | 'sse' | 'websocket';
+    url: string;
+  }>;
+  environmentVariables?: Array<{
+    name: string;
+    description?: string;
+    required?: boolean;
+  }>;
+}
+
+export interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: any;
+  serverId?: string;
+}
+
+export interface MCPResource {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+  serverId?: string;
+}
+
+export interface MCPPrompt {
+  name: string;
+  description?: string;
+  arguments?: Array<{
+    name: string;
+    description?: string;
+    required?: boolean;
+  }>;
+  serverId?: string;
+}
+
+export interface MCPConfiguration {
+  mcpServers: Record<string, MCPServerDefinition>;
+  settings?: {
+    maxOutputTokens?: number;
+    timeout?: number;
+    enableToolSearch?: boolean | 'auto' | string;
+    allowedServers?: string[];
+    deniedServers?: string[];
+  };
+}
+
+export interface MCPSearchResult {
+  query: string;
+  tools: MCPTool[];
+  resources: MCPResource[];
+  prompts: MCPPrompt[];
+}
+
+export interface MCPAuthToken {
+  serverId: string;
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: Date;
+  scope?: string[];
+}
