@@ -552,3 +552,90 @@ export interface PromptVersion {
   testResults?: PromptTestResult[];
   notes?: string;
 }
+
+// Cloud Sync Types
+export type SyncProvider = 'supabase' | 'custom' | 'none';
+
+export interface CloudSyncConfig {
+  provider: SyncProvider;
+  enabled: boolean;
+  autoSync: boolean;
+  syncInterval: number; // in seconds
+  lastSyncAt?: Date;
+  syncDirection: 'upload' | 'download' | 'bidirectional';
+  excludedPaths?: string[];
+}
+
+export interface SyncStatus {
+  status: 'idle' | 'syncing' | 'error' | 'offline';
+  progress?: number;
+  lastSync?: Date;
+  error?: string;
+  pendingChanges: number;
+}
+
+export interface SyncItem {
+  id: string;
+  path: string;
+  type: 'file' | 'directory' | 'setting' | 'agent' | 'project';
+  action: 'create' | 'update' | 'delete';
+  localVersion: string;
+  remoteVersion?: string;
+  status: 'pending' | 'syncing' | 'synced' | 'conflict' | 'error';
+  timestamp: Date;
+  deviceId: string;
+}
+
+export interface CloudSession {
+  id: string;
+  deviceId: string;
+  deviceName: string;
+  platform: string;
+  lastActiveAt: Date;
+  currentProject?: string;
+  status: 'active' | 'idle' | 'disconnected';
+}
+
+export interface TeleportRequest {
+  id: string;
+  sourceDeviceId: string;
+  targetDeviceId: string;
+  projectPath: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'completed' | 'failed';
+  createdAt: Date;
+  completedAt?: Date;
+  error?: string;
+}
+
+// Realtime API Types (Voice/Audio)
+export interface RealtimeConfig {
+  provider: 'openai' | 'custom';
+  apiKey?: string;
+  voice?: string;
+  model?: string;
+  language?: string;
+  enableSTT: boolean;
+  enableTTS: boolean;
+}
+
+export interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+  isFinal: boolean;
+  timestamp: Date;
+}
+
+export interface SpeechSynthesisOptions {
+  text: string;
+  voice?: string;
+  rate?: number;
+  pitch?: number;
+  volume?: number;
+}
+
+export interface AudioStream {
+  data: string; // base64
+  format: 'mp3' | 'wav' | 'opus';
+  sampleRate: number;
+  channels: number;
+}

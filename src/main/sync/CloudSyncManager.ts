@@ -460,6 +460,66 @@ export class CloudSyncManager extends EventEmitter {
     await this.performSync();
   }
 
+  // Teleportation - Transfer session context to another device
+  async teleportToDevice(targetDeviceId: string, projectPath: string): Promise<{ success: boolean; message: string }> {
+    if (!this.supabase) {
+      return { success: false, message: 'Cloud sync not configured' };
+    }
+
+    try {
+      // Get current thread/agent state
+      const currentThread = await this.getLocalThread(projectPath);
+      
+      if (!currentThread) {
+        return { success: false, message: 'No active session to teleport' };
+      }
+
+      // Create teleport record
+      const { error } = await this.supabase
+        .from('teleport_requests')
+        .insert({
+          source_device_id: this.config.deviceId,
+          target_device_id: targetDeviceId,
+          project_path: projectPath,
+          thread_data: JSON.stringify(currentThread),
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        });
+
+      if (error) throw error;
+
+      log.info(`Teleport initiated: ${projectPath} to ${targetDeviceId}`);
+      return { success: true, message: 'Teleport request sent' };
+    } catch (error: any) {
+      log.error('Teleport failed:', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  // Get available devices for teleportation
+  async getAvailableDevices(): Promise<Array<{ deviceId: string; lastActive: Date }>> {
+    if (!this.supabase) return [];
+
+    try {
+      const { data, error } = await this.supabase
+        .from('devices')
+        .select('device_id, last_active')
+        .neq('device_id', this.config.deviceId)
+        .eq('user_id', this.config.userId)
+        .eq('online', true);
+
+      if (error) throw error;
+
+      return (data || []).map(d => ({
+        deviceId: d.device_id,
+        lastActive: new Date(d.last_active),
+      }));
+    } catch (error) {
+      log.error('Failed to get devices:', error);
+      return [];
+    }
+  }
+
   cleanup(): void {
     this.stopSync();
     this.removeRealtimeSubscription();
