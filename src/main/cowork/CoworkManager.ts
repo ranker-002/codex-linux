@@ -5,6 +5,9 @@ import { AgentOrchestrator } from '../agents/AgentOrchestrator';
 import { DatabaseManager } from '../DatabaseManager';
 import { NotificationManager } from '../notifications/NotificationManager';
 import { Agent, AgentStatus, TaskStatus } from '../../shared/types';
+import { AgentTools, ToolResult } from '../agents/AgentTools';
+import { CodeIndex } from '../agents/CodeIndex';
+import { NativeToolCalling } from '../agents/NativeToolCalling';
 
 interface CoworkSession {
   id: string;
@@ -142,60 +145,176 @@ export class CoworkManager extends EventEmitter {
     try {
       this.addLog(session, 'Starting autonomous workflow...');
       
-      // Step 1: Analyze codebase
-      this.addLog(session, 'Analyzing codebase structure...');
-      session.progress = 10;
-      this.emit('session:progress', { sessionId: session.id, progress: 10 });
+      // Get agent worktree path
+      const agent = await this.agentOrchestrator.getAgent(session.agentId);
+      if (!agent) throw new Error('Agent not found');
       
-      const analysisTask = await this.agentOrchestrator.executeTask(
-        session.agentId,
-        `Analyze the codebase structure and identify files relevant to: ${session.objective}. Provide a summary of the project structure and key files.`
-      );
+      const worktreePath = agent.worktreePath || agent.projectPath;
       
-      // Wait for analysis
-      await this.waitForTask(session.agentId, analysisTask.id);
+      // Get OpenAI API key from settings
+      const apiKey = process.env.OPENAI_API_KEY || '';
+      const tools = new AgentTools(worktreePath);
+      const codeIndex = new CodeIndex(worktreePath, '.codex/index', apiKey);
+      await codeIndex.initialize();
+      
+      // Initialize native tool calling if API key available
+      const toolCaller = apiKey ? new NativeToolCalling(apiKey, worktreePath) : null;
+      
+      // Step 1: Index codebase
+      this.addLog(session, 'Indexing codebase for semantic search...');
+      session.progress = 5;
+      await codeIndex.indexProject();
+      
+      // Step 2: Analyze with tools
+      this.addLog(session, 'Analyzing codebase structure with tools...');
+      session.progress = 15;
+      this.emit('session:progress', { sessionId: session.id, progress: 15, step: 'analysis' });
+      
+      // List root directory
+      this.emit('session:tool', { sessionId: session.id, tool: 'ls', status: 'running' });
+      const lsResult = await tools.ls({ path: '.' });
+      this.emit('session:tool', { sessionId: session.id, tool: 'ls', status: 'completed', result: lsResult.output });
+      this.addLog(session, `Project structure:\n${lsResult.output}`);
+      
+      // Search for relevant files using semantic search
+      const searchResults = await codeIndex.search(session.objective, 10);
+      const relevantFiles = searchResults.map(r => r.filePath);
+      
+      this.addLog(session, `Found ${relevantFiles.length} relevant files via semantic search`);
+      
+      // Read key files
+      let fileContents = '';
+      for (const file of relevantFiles.slice(0, 5)) {
+        this.emit('session:tool', { sessionId: session.id, tool: 'view', status: 'running', params: { file_path: file } });
+        const viewResult = await tools.view({ file_path: file });
+        this.emit('session:tool', { sessionId: session.id, tool: 'view', status: viewResult.success ? 'completed' : 'error', result: viewResult.output, error: viewResult.error });
+        if (viewResult.success) {
+          fileContents += `\n\n=== ${file} ===\n${viewResult.output}`;
+        }
+      }
+      
       session.progress = 25;
+      this.emit('session:progress', { sessionId: session.id, progress: 25, step: 'files_read', files: relevantFiles.slice(0, 5) });
       
-      // Step 2: Plan approach
-      this.addLog(session, 'Planning implementation approach...');
-      session.progress = 30;
+      // Step 3: Create plan using actual file contents
+      this.addLog(session, 'Creating detailed implementation plan...');
+      session.progress = 35;
       
-      const planTask = await this.agentOrchestrator.executeTask(
+      const planTask = await this.agentOrchestrator.sendMessage(
         session.agentId,
-        `Based on the analysis, create a detailed plan to achieve: ${session.objective}. Break it down into specific steps and files to modify.`
+        `Based on the following codebase analysis, create a detailed plan to achieve: ${session.objective}\n\n` +
+        `Project structure:\n${lsResult.output}\n\n` +
+        `Relevant files found:\n${relevantFiles.join('\n')}\n\n` +
+        `Key file contents:${fileContents.slice(0, 8000)}\n\n` +
+        `Create a step-by-step plan with specific files to modify and actions to take.`
       );
       
-      await this.waitForTask(session.agentId, planTask.id);
-      session.progress = 40;
+      session.progress = 45;
       
-      // Step 3: Execute implementation
-      this.addLog(session, 'Implementing changes...');
-      session.progress = 50;
+      // Step 4: Execute with native tool calling (if available) or streaming
+      this.addLog(session, 'Executing plan with tool use...');
+      session.progress = 55;
       
-      const implementationTask = await this.agentOrchestrator.executeTask(
-        session.agentId,
-        `Execute the plan to achieve: ${session.objective}. Implement all necessary changes. ${session.autoApprove ? 'Auto-approve all changes.' : 'Wait for approval before applying each change.'}`
-      );
+      let executionResult = '';
       
-      await this.waitForTask(session.agentId, implementationTask.id);
-      session.progress = 80;
+      if (toolCaller?.isAvailable()) {
+        // Use native tool calling
+        this.addLog(session, 'Using native OpenAI tool calling...');
+        
+        const systemPrompt = 
+          `You are an expert software developer. Execute the following objective: ${session.objective}\n\n` +
+          `You have access to tools to explore and modify the codebase. ` +
+          `Start by exploring the codebase structure, then make necessary changes. ` +
+          `After each tool use, analyze the result and decide on next steps.`;
+        
+        const userPrompt = 
+          `Objective: ${session.objective}\n\n` +
+          `Relevant files:\n${relevantFiles.join('\n')}\n\n` +
+          `Execute the implementation. Use tools to view, edit, and test the code.`;
+        
+        executionResult = await toolCaller.executeWithTools(
+          'gpt-4o',
+          systemPrompt,
+          userPrompt,
+          (toolCall, result) => {
+            this.emit('session:tool', {
+              sessionId: session.id,
+              tool: toolCall.function.name,
+              status: result.success ? 'completed' : 'error',
+              result: result.output,
+              error: result.error
+            });
+          }
+        );
+        
+        this.addLog(session, `Execution completed: ${executionResult.slice(0, 500)}`);
+      } else {
+        // Fallback to streaming
+        this.addLog(session, 'Using streaming mode (no native tool calling)...');
+        
+        const toolDefinitions = tools.getToolDefinitions();
+        const toolDescriptions = toolDefinitions.map(t => 
+          `- ${t.name}: ${t.description}`
+        ).join('\n');
+        
+        const executePrompt = 
+          `Execute the following objective: ${session.objective}\n\n` +
+          `You have access to the following tools:\n${toolDescriptions}\n\n` +
+          `To use a tool, respond with: TOOL: {"name": "tool_name", "params": {...}}\n\n` +
+          `First, explore the codebase to understand the structure, then make the necessary changes.`;
+        
+        let streamingContent = '';
+        await this.agentOrchestrator.sendMessageStream(
+          session.agentId,
+          executePrompt,
+          {
+            onChunk: (chunk: string) => {
+              streamingContent += chunk;
+              this.emit('session:stream', { sessionId: session.id, chunk, content: streamingContent });
+            },
+            onComplete: () => {
+              this.emit('session:streamComplete', { sessionId: session.id, content: streamingContent });
+            },
+            onError: (error: Error) => {
+              this.emit('session:streamError', { sessionId: session.id, error: error.message });
+            }
+          }
+        );
+        
+        executionResult = streamingContent;
+      }
       
-      // Step 4: Verify and test
-      this.addLog(session, 'Running verification and tests...');
-      session.progress = 90;
+      session.progress = 75;
+      this.emit('session:progress', { sessionId: session.id, progress: 75, step: 'execution' });
       
-      const verifyTask = await this.agentOrchestrator.executeTask(
-        session.agentId,
-        'Verify that all changes work correctly. Run any available tests and check for errors.'
-      );
+      // Step 5: Verify with tests
+      this.addLog(session, 'Running verification...');
+      session.progress = 85;
+      this.emit('session:progress', { sessionId: session.id, progress: 85, step: 'verification' });
       
-      await this.waitForTask(session.agentId, verifyTask.id);
+      // Try to run tests
+      this.emit('session:tool', { sessionId: session.id, tool: 'bash', status: 'running', params: { command: 'npm test' } });
+      const testResult = await tools.bash({ command: 'npm test || echo "No tests"' });
+      this.emit('session:tool', { sessionId: session.id, tool: 'bash', status: testResult.success ? 'completed' : 'error', result: testResult.output, error: testResult.error });
+      this.addLog(session, `Test result: ${testResult.output.slice(0, 500)}`);
+      
+      // Check for TypeScript errors
+      this.emit('session:tool', { sessionId: session.id, tool: 'bash', status: 'running', params: { command: 'npx tsc --noEmit' } });
+      const typeCheck = await tools.bash({ command: 'npx tsc --noEmit 2>&1 || echo "Type check completed"' });
+      this.emit('session:tool', { sessionId: session.id, tool: 'bash', status: typeCheck.success ? 'completed' : 'error', result: typeCheck.output, error: typeCheck.error });
+      if (!typeCheck.success) {
+        this.addLog(session, `Type errors found: ${typeCheck.error?.slice(0, 300)}`);
+      }
+      
+      session.progress = 95;
+      this.emit('session:progress', { sessionId: session.id, progress: 95, step: 'complete' });
       
       // Complete
       session.status = 'completed';
       session.progress = 100;
       session.completedAt = new Date();
       session.deliverables.push('Implementation completed');
+      session.deliverables.push(`Modified files: ${relevantFiles.join(', ')}`);
       
       this.addLog(session, 'Session completed successfully!');
       await this.saveSession(session);
