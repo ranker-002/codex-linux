@@ -483,3 +483,72 @@ export interface MCPAuthToken {
   expiresAt?: Date;
   scope?: string[];
 }
+
+// Prompt Optimizer Types
+export interface PromptAnalysis {
+  originalPrompt: string;
+  optimizedPrompt: string;
+  improvements: PromptImprovement[];
+  metrics: {
+    clarity: number;
+    specificity: number;
+    context: number;
+    structure: number;
+    overall: number;
+  };
+  estimatedTokens: number;
+  suggestions: string[];
+}
+
+export interface PromptImprovement {
+  type: 'clarity' | 'specificity' | 'context' | 'structure' | 'examples' | 'constraints';
+  description: string;
+  before: string;
+  after: string;
+  impact: 'high' | 'medium' | 'low';
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  template: string;
+  variables: string[];
+  exampleInput?: string;
+  exampleOutput?: string;
+  tags: string[];
+}
+
+export interface PromptOptimizationOptions {
+  goal?: string;
+  targetModel?: string;
+  maxLength?: number;
+  style?: 'concise' | 'detailed' | 'technical' | 'conversational';
+  addExamples?: boolean;
+  addConstraints?: boolean;
+  improveStructure?: boolean;
+}
+
+export interface PromptTestResult {
+  prompt: string;
+  response: string;
+  metrics: {
+    responseQuality: number;
+    relevance: number;
+    completeness: number;
+    tokenUsage: number;
+    latency: number;
+  };
+  timestamp: Date;
+}
+
+export interface PromptVersion {
+  id: string;
+  prompt: string;
+  version: number;
+  timestamp: Date;
+  tags: string[];
+  testResults?: PromptTestResult[];
+  notes?: string;
+}
