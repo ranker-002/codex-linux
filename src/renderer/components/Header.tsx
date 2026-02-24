@@ -1,8 +1,6 @@
 import React from 'react';
 import { Agent } from '../../shared/types';
-import { Bot, MoreVertical, Minus, Square, X, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { VoiceCommand } from './VoiceCommand';
+import { Minus, Square, X, Search } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -10,12 +8,8 @@ interface HeaderProps {
   onSettingsClick: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeTab, agents, onSettingsClick }) => {
+export const Header: React.FC<HeaderProps> = ({ activeTab, agents }) => {
   const runningAgents = agents.filter(a => a.status === 'running').length;
-
-  const handleVoiceCommand = (transcript: string) => {
-    console.log('Voice command:', transcript);
-  };
 
   const getTitle = () => {
     switch (activeTab) {
@@ -25,17 +19,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, agents, onSettingsCli
       case 'automations': return 'Automations';
       case 'settings': return 'Settings';
       default: return 'Codex';
-    }
-  };
-
-  const getDescription = () => {
-    switch (activeTab) {
-      case 'agents': return 'Manage your AI coding agents';
-      case 'worktrees': return 'Isolated Git workspaces';
-      case 'skills': return 'Reusable AI capabilities';
-      case 'automations': return 'Scheduled tasks and workflows';
-      case 'settings': return 'Configure your preferences';
-      default: return '';
     }
   };
 
@@ -52,34 +35,37 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, agents, onSettingsCli
   };
 
   return (
-    <header className="h-16 border-b border-[var(--color-border)] bg-[var(--color-bg-elevated)] flex items-center justify-between px-6" data-testid="app-header">
-      <div className="flex items-center gap-6">
+    <header 
+      className="h-12 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between px-5"
+      data-testid="app-header"
+    >
+      <div className="flex items-center gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]" data-testid="page-title">
+          <h1 
+            className="text-[18px] font-medium text-[var(--text-primary)] tracking-tight"
+            data-testid="page-title"
+            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 300 }}
+          >
             {getTitle()}
           </h1>
-          <p className="text-xs text-[var(--color-text-tertiary)]">
-            {getDescription()}
-          </p>
         </div>
         
         {activeTab === 'agents' && runningAgents > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-medium" data-testid="running-agents-badge">
+          <div className="flex items-center gap-2 px-3 py-1 bg-[rgba(60,200,120,0.1)] border border-[rgba(60,200,120,0.2)] rounded-full text-[11px] font-medium text-[var(--success)]">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--success)]"></span>
             </span>
             {runningAgents} running
           </div>
         )}
 
-        {/* Search */}
         <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
           <input
             type="text"
             placeholder="Search..."
-            className="pl-9 pr-4 py-2 bg-neutral-100 border-0 rounded-lg text-sm w-64 focus:ring-2 focus:ring-neutral-200 transition-all"
+            className="pl-8 pr-3 py-1.5 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] w-56 focus:outline-none focus:border-[var(--teal-500)] transition-colors"
             data-testid="search-input"
           />
         </div>
@@ -88,24 +74,24 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, agents, onSettingsCli
       <div className="flex items-center gap-1">
         <button
           onClick={handleMinimize}
-          className="p-2 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors"
+          className="p-2 hover:bg-[var(--bg-hover)] rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           data-testid="window-minimize"
         >
-          <Minus className="w-4 h-4" />
+          <Minus className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={handleMaximize}
-          className="p-2 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors"
+          className="p-2 hover:bg-[var(--bg-hover)] rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           data-testid="window-maximize"
         >
-          <Square className="w-4 h-4" />
+          <Square className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={handleClose}
-          className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-neutral-500 transition-colors"
+          className="p-2 hover:bg-[rgba(232,90,106,0.1)] hover:text-[var(--error)] rounded-[var(--radius-sm)] text-[var(--text-muted)] transition-colors"
           data-testid="window-close"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </header>
