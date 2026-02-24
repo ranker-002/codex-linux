@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Settings, AIProvider } from '../../shared/types';
-import { Settings as SettingsIcon, Key, Eye, EyeOff, Save } from 'lucide-react';
+import { Settings as SettingsIcon, Key, Eye, EyeOff, Save, Zap, Check, Sparkles } from 'lucide-react';
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -16,9 +16,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [localSettings, setLocalSettings] = useState(settings);
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState('general');
+  const [selectedModel, setSelectedModel] = useState<string>(localSettings.defaultModel);
 
   const handleSave = async () => {
-    // Save all settings
     for (const [key, value] of Object.entries(localSettings)) {
       await window.electronAPI.settings.set(key, value);
     }
@@ -40,12 +40,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
+  const handleModelSelect = (modelId: string, providerId: string) => {
+    setSelectedModel(modelId);
+    setLocalSettings({
+      ...localSettings,
+      defaultModel: modelId,
+      defaultProvider: providerId
+    });
+  };
+
   const tabs = [
     { id: 'general', label: 'General' },
     { id: 'providers', label: 'AI Providers' },
     { id: 'appearance', label: 'Appearance' },
     { id: 'shortcuts', label: 'Shortcuts' }
   ];
+
+  const freeModelsProvider = providers.find(p => p.isFree);
+  const paidProviders = providers.filter(p => !p.isFree);
 
   return (
     <div className="h-full flex flex-col">
@@ -166,12 +178,83 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         )}
 
         {activeTab === 'providers' && (
-          <div className="max-w-2xl space-y-6">
+          <div className="max-w-4xl space-y-6">
+            {freeModelsProvider && (
+              <section className="p-4 border-2 border-green-500/30 bg-green-500/5 rounded-lg">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="w-5 h-5 text-green-500" />
+                  <h3 className="text-lg font-medium">Free AI Models</h3>
+                  <span className="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-500 rounded-full">
+                    No API Key Required
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Start using AI immediately with free models from OpenRouter, Groq, Google AI Studio, and Cerebras. 
+                  No API key required for OpenRouter free tier - just select a model and start chatting!
+                </p>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Select Model</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+                    {freeModelsProvider.models
+                      .sort((a, b) => {
+                        const backends = ['openrouter', 'groq', 'google', 'cerebras'];
+                        const aBackend = a.backend || 'openrouter';
+                        const bBackend = b.backend || 'openrouter';
+                        return backends.indexOf(aBackend) - backends.indexOf(bBackend);
+                      })
+                      .map(model => (
+                      <button
+                        key={model.id}
+                        onClick={() => handleModelSelect(model.id, freeModelsProvider.id)}
+                        className={`p-3 text-left rounded-lg border transition-all ${
+                          selectedModel === model.id
+                            ? 'border-green-500 bg-green-500/10'
+                            : 'border-border hover:border-green-500/50 hover:bg-muted'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm truncate">{model.name}</span>
+                          {selectedModel === model.id && (
+                            <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                            {model.backend || 'openrouter'}
+                          </span>
+                          {model.supportsVision && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                              vision
+                            </span>
+                          )}
+                          {model.contextWindow >= 100000 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                              {model.contextWindow >= 1000000 ? '1M ctx' : `${model.contextWindow / 1000}k ctx`}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{model.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  <strong>Tip:</strong> OpenRouter models work without an API key. For Groq, Google AI Studio, or Cerebras models, 
+                  you may need to add your free API key below.
+                </div>
+              </section>
+            )}
+
             <section>
-              <h3 className="text-lg font-medium mb-4">AI Provider Configuration</h3>
+              <h3 className="text-lg font-medium mb-4">Premium Providers</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add your API keys for premium models with higher limits and advanced features.
+              </p>
               
-              <div className="space-y-6">
-                {providers.map(provider => (
+              <div className="space-y-4">
+                {paidProviders.map(provider => (
                   <div key={provider.id} className="p-4 bg-muted rounded-lg">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -220,21 +303,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       </div>
                     </div>
 
-                    <div className="mt-3">
-                      <label className="block text-sm font-medium mb-1">Available Models</label>
-                      <div className="flex flex-wrap gap-2">
-                        {provider.models.map(model => (
-                          <span
-                            key={model.id}
-                            className="px-2 py-1 bg-background rounded text-xs"
-                          >
-                            {model.name}
-                          </span>
-                        ))}
+                    {provider.models.length > 0 && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium mb-1">Available Models</label>
+                        <div className="flex flex-wrap gap-2">
+                          {provider.models.map(model => (
+                            <span
+                              key={model.id}
+                              className="px-2 py-1 bg-background rounded text-xs"
+                            >
+                              {model.name}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-blue-400" />
+                <h4 className="font-medium text-blue-400">Get Free API Keys</h4>
+              </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p><strong>OpenRouter:</strong> <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">openrouter.ai</a> - No key needed for free models</p>
+                <p><strong>Ollama:</strong> <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ollama.com</a> - Local models, no API key needed</p>
+                <p><strong>NVIDIA NIM:</strong> <a href="https://build.nvidia.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">build.nvidia.com</a> - Kimi K2.5, DeepSeek R1, Llama (40 req/min free)</p>
+                <p><strong>Groq:</strong> <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console.groq.com</a> - Fast inference, generous free tier</p>
+                <p><strong>Google AI Studio:</strong> <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">aistudio.google.com</a> - Gemini models free tier</p>
+                <p><strong>Cerebras:</strong> <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">cloud.cerebras.ai</a> - Ultra-fast inference</p>
               </div>
             </section>
           </div>

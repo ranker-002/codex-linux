@@ -173,6 +173,8 @@ export interface AIProvider {
   enabled: boolean;
   config: ProviderConfig;
   models: ProviderModel[];
+  requiresApiKey?: boolean;
+  isFree?: boolean;
 }
 
 export interface ProviderConfig {
@@ -196,6 +198,8 @@ export interface ProviderModel {
     input: number;
     output: number;
   };
+  isFree?: boolean;
+  backend?: string;
 }
 
 export interface Settings {

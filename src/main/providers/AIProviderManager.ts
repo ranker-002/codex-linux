@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import log from 'electron-log';
 import { AIProvider, ProviderConfig, ProviderModel } from '../../shared/types';
 import { SettingsManager } from '../SettingsManager';
+import { FreeModelsProvider, FREE_MODELS } from './FreeModelsProvider';
 
 interface AIProviderInterface {
   sendMessage(
@@ -260,8 +261,22 @@ export class AIProviderManager extends EventEmitter {
   }
 
   private initializeProviders(): void {
-    // Default providers configuration
     const defaultProviders: AIProvider[] = [
+      {
+        id: 'free-models',
+        name: 'Free AI Models',
+        description: 'Free open-source models via OpenRouter, Groq, and more - No API key required for OpenRouter free tier',
+        enabled: true,
+        config: {
+          apiKey: '',
+          baseUrl: 'https://openrouter.ai/api/v1',
+          timeout: 60000,
+          maxRetries: 3
+        },
+        models: FREE_MODELS,
+        isFree: true,
+        requiresApiKey: false
+      },
       {
         id: 'openai',
         name: 'OpenAI',
@@ -273,7 +288,8 @@ export class AIProviderManager extends EventEmitter {
           timeout: 60000,
           maxRetries: 3
         },
-        models: []
+        models: [],
+        requiresApiKey: true
       },
       {
         id: 'anthropic',
@@ -286,7 +302,8 @@ export class AIProviderManager extends EventEmitter {
           timeout: 60000,
           maxRetries: 3
         },
-        models: []
+        models: [],
+        requiresApiKey: true
       }
     ];
 
@@ -309,6 +326,9 @@ export class AIProviderManager extends EventEmitter {
         break;
       case 'anthropic':
         this.providerInstances.set(provider.id, new AnthropicProvider(provider.config));
+        break;
+      case 'free-models':
+        this.providerInstances.set(provider.id, new FreeModelsProvider(provider.config));
         break;
       default:
         log.warn(`Unknown provider: ${provider.id}`);

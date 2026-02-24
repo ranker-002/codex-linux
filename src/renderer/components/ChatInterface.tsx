@@ -1,39 +1,144 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Agent, AgentMessage, AgentStatus, PermissionMode } from '../../shared/types';
-import { Send, Bot, User, Loader2, Paperclip, MoreVertical, Copy, Check } from 'lucide-react';
+import { Send, Bot, User, Loader2, Paperclip, MoreVertical, Copy, Check, ChevronDown, Sparkles, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 import { PermissionSelector } from './PermissionSelector';
+
+interface ModelOption {
+  id: string;
+  name: string;
+  backend: string;
+  isFree?: boolean;
+  contextWindow?: number;
+  supportsVision?: boolean;
+}
 
 interface ChatInterfaceProps {
   agent: Agent;
   onSendMessage: (message: string) => Promise<void>;
   onExecuteTask: (task: string) => Promise<void>;
   onPermissionModeChange?: (mode: PermissionMode) => void;
+  onModelChange?: (modelId: string) => void;
   allowBypassMode?: boolean;
   isLoading?: boolean;
+  availableModels?: ModelOption[];
+  currentModel?: string;
 }
+
+const FREE_MODELS: ModelOption[] = [
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', backend: 'openrouter', isFree: true, contextWindow: 128000 },
+  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1', backend: 'openrouter', isFree: true, contextWindow: 128000 },
+  { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', backend: 'openrouter', isFree: true, contextWindow: 32768 },
+  { id: 'google/gemma-3-12b-it:free', name: 'Gemma 3 12B', backend: 'openrouter', isFree: true, contextWindow: 32768 },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', backend: 'openrouter', isFree: true, contextWindow: 128000, supportsVision: true },
+  { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder', backend: 'openrouter', isFree: true, contextWindow: 32768 },
+  { id: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 405B', backend: 'openrouter', isFree: true, contextWindow: 128000 },
+  { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B', backend: 'openrouter', isFree: true, contextWindow: 128000 },
+  { id: 'nvidia/nemotron-nano-12b-v2-vl:free', name: 'Nemotron 12B VL', backend: 'openrouter', isFree: true, contextWindow: 32768, supportsVision: true },
+  { id: 'z-ai/glm-4.5-air:free', name: 'GLM 4.5 Air', backend: 'openrouter', isFree: true, contextWindow: 128000 },
+  { id: 'liquid/lfm-2.5-1.2b-instruct:free', name: 'LFM 2.5 1.2B', backend: 'openrouter', isFree: true, contextWindow: 8192 },
+  { id: 'upstage/solar-pro-3:free', name: 'Solar Pro 3', backend: 'openrouter', isFree: true, contextWindow: 32768 },
+  { id: 'moonshotai/kimi-k2.5', name: 'Kimi K2.5', backend: 'nvidia', isFree: true, contextWindow: 128000 },
+  { id: 'meta/llama-3.3-70b-instruct', name: 'Llama 3.3 70B (NVIDIA)', backend: 'nvidia', isFree: true, contextWindow: 128000 },
+  { id: 'google/gemma-2-27b-it', name: 'Gemma 2 27B (NVIDIA)', backend: 'nvidia', isFree: true, contextWindow: 8192 },
+  { id: 'microsoft/phi-3-medium-128k-instruct', name: 'Phi-3 Medium 128K', backend: 'nvidia', isFree: true, contextWindow: 128000 },
+  { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Groq)', backend: 'groq', isFree: true, contextWindow: 128000 },
+  { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B (Groq)', backend: 'groq', isFree: true, contextWindow: 128000 },
+  { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Groq)', backend: 'groq', isFree: true, contextWindow: 32768 },
+  { id: 'gemma2-9b-it', name: 'Gemma 2 9B (Groq)', backend: 'groq', isFree: true, contextWindow: 8192 },
+  { id: 'minimax-m2.5:cloud', name: 'Minimax M2.5 (Ollama)', backend: 'ollama', isFree: true, contextWindow: 128000 },
+  { id: 'llama3.2:latest', name: 'Llama 3.2 (Ollama)', backend: 'ollama', isFree: true, contextWindow: 128000, supportsVision: true },
+  { id: 'llama3.3:latest', name: 'Llama 3.3 70B (Ollama)', backend: 'ollama', isFree: true, contextWindow: 128000 },
+  { id: 'mistral:latest', name: 'Mistral 7B (Ollama)', backend: 'ollama', isFree: true, contextWindow: 32768 },
+  { id: 'deepseek-r1:latest', name: 'DeepSeek R1 (Ollama)', backend: 'ollama', isFree: true, contextWindow: 128000 },
+  { id: 'qwen2.5:latest', name: 'Qwen 2.5 (Ollama)', backend: 'ollama', isFree: true, contextWindow: 128000 },
+  { id: 'qwen2.5-coder:latest', name: 'Qwen 2.5 Coder (Ollama)', backend: 'ollama', isFree: true, contextWindow: 32768 },
+  { id: 'gemma3:latest', name: 'Gemma 3 (Ollama)', backend: 'ollama', isFree: true, contextWindow: 32768, supportsVision: true },
+  { id: 'phi3:latest', name: 'Phi-3 (Ollama)', backend: 'ollama', isFree: true, contextWindow: 128000 },
+  { id: 'codellama:latest', name: 'Code Llama (Ollama)', backend: 'ollama', isFree: true, contextWindow: 16384 },
+  { id: 'deepseek-coder:latest', name: 'DeepSeek Coder (Ollama)', backend: 'ollama', isFree: true, contextWindow: 16384 },
+];
+
+const BACKEND_LABELS: Record<string, string> = {
+  openrouter: 'OpenRouter',
+  nvidia: 'NVIDIA NIM',
+  groq: 'Groq',
+  ollama: 'Ollama',
+  google: 'Google AI',
+  cerebras: 'Cerebras',
+};
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   agent,
   onSendMessage,
   onExecuteTask,
   onPermissionModeChange,
+  onModelChange,
   allowBypassMode = false,
-  isLoading = false
+  isLoading = false,
+  availableModels,
+  currentModel,
 }) => {
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedAutoContext, setExpandedAutoContext] = useState<Record<string, boolean>>({});
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(currentModel || agent.model);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBackend, setSelectedBackend] = useState<string>('all');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const modelSelectorRef = useRef<HTMLDivElement>(null);
+
+  const models = availableModels || FREE_MODELS;
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [agent.messages]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelSelectorRef.current && !modelSelectorRef.current.contains(event.target as Node)) {
+        setShowModelSelector(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (currentModel) {
+      setSelectedModel(currentModel);
+    }
+  }, [currentModel]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [agent.messages]);
+  const handleModelSelect = (modelId: string) => {
+    setSelectedModel(modelId);
+    setShowModelSelector(false);
+    onModelChange?.(modelId);
+  };
+
+  const filteredModels = models.filter(model => {
+    const matchesSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          model.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesBackend = selectedBackend === 'all' || model.backend === selectedBackend;
+    return matchesSearch && matchesBackend;
+  });
+
+  const groupedModels = filteredModels.reduce((acc, model) => {
+    const backend = model.backend || 'other';
+    if (!acc[backend]) acc[backend] = [];
+    acc[backend].push(model);
+    return acc;
+  }, {} as Record<string, ModelOption[]>);
+
+  const getCurrentModelInfo = () => {
+    return models.find(m => m.id === selectedModel) || { name: selectedModel, backend: 'unknown' };
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -41,15 +146,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const message = input;
     setInput('');
     
-    // Check for slash commands
     if (message.startsWith('/task ')) {
       await onExecuteTask(message.slice(6));
     } else if (message.startsWith('/search ')) {
-      // Handle search command
       const searchQuery = message.slice(8);
       await onSendMessage(`[SEARCH] ${searchQuery}`);
     } else if (message.startsWith('/vision ') || message.startsWith('/analyze ')) {
-      // Handle vision command
       const visionQuery = message.split(' ').slice(1).join(' ');
       await onSendMessage(`[VISION] ${visionQuery}`);
     } else {
@@ -93,20 +195,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       files: files
         .filter((f: any) => f && typeof f.path === 'string')
         .map((f: any) => ({ path: String(f.path), reason: String(f.reason || '') })),
-      totalChars: typeof raw.totalChars === 'number' ? raw.totalChars : undefined
+      totalChars: typeof raw.totalChars === 'number' ? raw.totalChars : undefined,
     };
   };
 
   const renderMessageContent = (content: string) => {
-    // Simple markdown-like rendering
     const lines = content.split('\n');
     return lines.map((line, index) => {
-      // Code blocks
       if (line.startsWith('```')) {
-        return null; // Handled separately
+        return null;
       }
       
-      // Inline code
       if (line.includes('`')) {
         const parts = line.split(/(`[^`]+`)/);
         return (
@@ -124,7 +223,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         );
       }
 
-      // Headers
       if (line.startsWith('### ')) {
         return <h3 key={index} className="text-lg font-semibold mt-4 mb-2">{line.slice(4)}</h3>;
       }
@@ -135,12 +233,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         return <h1 key={index} className="text-2xl font-bold mt-4 mb-2">{line.slice(2)}</h1>;
       }
 
-      // Lists
       if (line.startsWith('- ') || line.startsWith('* ')) {
         return <li key={index} className="ml-4 my-1">{line.slice(2)}</li>;
       }
 
-      // Empty line
       if (line.trim() === '') {
         return <br key={index} />;
       }
@@ -162,6 +258,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return codeBlocks;
   };
 
+  const currentModelInfo = getCurrentModelInfo();
+
   return (
     <div className="flex flex-col h-full bg-card">
       {/* Chat Header */}
@@ -175,9 +273,103 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           }`} />
           <div>
             <h3 className="font-medium">{agent.name}</h3>
-            <p className="text-xs text-muted-foreground">{agent.model}</p>
           </div>
         </div>
+        
+        {/* Model Selector */}
+        <div className="relative" ref={modelSelectorRef}>
+          <button
+            onClick={() => setShowModelSelector(!showModelSelector)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-lg transition-colors text-sm"
+          >
+            <Sparkles className="w-4 h-4 text-green-500" />
+            <span className="font-medium truncate max-w-[150px]">{currentModelInfo.name}</span>
+            <span className="text-xs text-muted-foreground px-1.5 py-0.5 bg-background rounded">
+              {BACKEND_LABELS[currentModelInfo.backend || 'unknown'] || currentModelInfo.backend}
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showModelSelector && (
+            <div className="absolute top-full right-0 mt-2 w-80 bg-background border border-border rounded-lg shadow-xl z-50 max-h-[70vh] overflow-hidden">
+              <div className="p-3 border-b border-border">
+                <input
+                  type="text"
+                  placeholder="Search models..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 bg-muted rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <div className="flex gap-1 mt-2 flex-wrap">
+                  <button
+                    onClick={() => setSelectedBackend('all')}
+                    className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                      selectedBackend === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {Object.entries(BACKEND_LABELS).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedBackend(key)}
+                      className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                        selectedBackend === key ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-y-auto max-h-[50vh]">
+                {Object.entries(groupedModels).map(([backend, backendModels]) => (
+                  <div key={backend}>
+                    <div className="px-3 py-2 bg-muted/50 text-xs font-medium text-muted-foreground sticky top-0">
+                      {BACKEND_LABELS[backend] || backend} ({backendModels.length})
+                    </div>
+                    {backendModels.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => handleModelSelect(model.id)}
+                        className={`w-full px-3 py-2 text-left hover:bg-muted/50 transition-colors flex items-center justify-between ${
+                          selectedModel === model.id ? 'bg-primary/10' : ''
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm truncate">{model.name}</span>
+                            {model.isFree && (
+                              <span className="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-500 rounded">
+                                FREE
+                              </span>
+                            )}
+                            {model.supportsVision && (
+                              <span className="px-1.5 py-0.5 text-[10px] bg-purple-500/20 text-purple-500 rounded">
+                                VISION
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">{model.id}</div>
+                        </div>
+                        {model.contextWindow && model.contextWindow >= 100000 && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {model.contextWindow >= 1000000 ? '1M' : `${model.contextWindow / 1000}K`}
+                          </span>
+                        )}
+                        {selectedModel === model.id && (
+                          <Check className="w-4 h-4 text-primary ml-2" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-3">
           {onPermissionModeChange && (
             <PermissionSelector
@@ -207,19 +399,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onClick={() => setInput('Can you help me refactor this code?')}
                 className="block px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                &quot;Can you help me refactor this code?&quot;
+                "Can you help me refactor this code?"
               </button>
               <button 
                 onClick={() => setInput('/task Review all JavaScript files for potential bugs')}
                 className="block px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                &quot;/task Review all JavaScript files...&quot;
+                "/task Review all JavaScript files..."
               </button>
               <button 
                 onClick={() => setInput('Explain how this function works')}
                 className="block px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
               >
-                &quot;Explain how this function works&quot;
+                "Explain how this function works"
               </button>
             </div>
           </div>
@@ -257,7 +449,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     ? 'bg-muted text-muted-foreground text-sm italic'
                     : 'bg-muted'
                 }`}>
-                  {/* Copy button */}
                   <button
                     onClick={() => copyToClipboard(message.content, message.id)}
                     className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 rounded-md"
@@ -269,7 +460,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     )}
                   </button>
 
-                  {/* Message content */}
                   <div className="prose prose-sm dark:prose-invert max-w-none pr-8">
                     {message.role === 'assistant' && (() => {
                       const ac = getAutoContext(message);
@@ -282,7 +472,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                             className="text-xs px-2 py-1 rounded-md bg-background/60 hover:bg-background/80 border border-border text-muted-foreground"
                             type="button"
                           >
-                            Auto-context: {ac.files.length} files{typeof ac.totalChars === 'number' ? ` • ${ac.totalChars} chars` : ''}
+                            Auto-context: {ac.files.length} files{typeof ac.totalChars === 'number' ? `  ${ac.totalChars} chars` : ''}
                             {isExpanded ? ' (hide)' : ' (show)'}
                           </button>
 
@@ -292,7 +482,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                 {ac.files.map((f, idx) => (
                                   <div key={`${message.id}-ac-${idx}`} className="flex gap-2">
                                     <span className="font-mono text-foreground truncate max-w-[260px]">{f.path}</span>
-                                    <span className="text-muted-foreground">— {f.reason}</span>
+                                    <span className="text-muted-foreground">- {f.reason}</span>
                                   </div>
                                 ))}
                               </div>
@@ -305,7 +495,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     {renderMessageContent(message.content)}
                   </div>
 
-                  {/* Code blocks */}
                   {extractCodeBlocks(message.content).map((block, idx) => (
                     <div key={idx} className="mt-4 rounded-lg overflow-hidden border border-border">
                       <div className="flex items-center justify-between px-3 py-2 bg-background/50 border-b border-border">
@@ -327,7 +516,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </div>
                   ))}
 
-                  {/* Timestamp */}
                   <div className={`text-xs mt-2 ${
                     message.role === 'user' 
                       ? 'text-primary-foreground/60' 
@@ -341,7 +529,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           ))
         )}
         
-        {/* Loading indicator */}
         {isLoading && (
           <div className="flex gap-3">
             <div className="w-8 h-8 rounded-lg bg-green-500/10 text-green-500 flex items-center justify-center">
