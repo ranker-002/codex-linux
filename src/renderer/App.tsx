@@ -9,9 +9,10 @@ import { AutomationPanel } from './components/AutomationPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CodeWorkspace } from './components/CodeWorkspace';
 import { AuditTrailPanel } from './components/AuditTrailPanel';
+import { WelcomeChat } from './components/WelcomeChat';
 import { I18nProvider } from './i18n/I18nProvider';
 import { Agent, Worktree, Skill, Automation, AIProvider, Settings } from '../shared/types';
-import './styles/minimalist.css';
+import './styles/abyss-teal.css';
 
 function App() {
   const navigate = useNavigate();
@@ -29,7 +30,11 @@ function App() {
 
   useEffect(() => {
     const path = location.pathname;
-    if (path === '/' || path.startsWith('/agents')) {
+    if (path === '/') {
+      setActiveTab('chat');
+      return;
+    }
+    if (path.startsWith('/agents')) {
       setActiveTab('agents');
       return;
     }
@@ -53,14 +58,17 @@ function App() {
       setActiveTab('settings');
       return;
     }
-    setActiveTab('agents');
+    setActiveTab('chat');
   }, [location.pathname]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     switch (tab) {
-      case 'agents':
+      case 'chat':
         navigate('/');
+        break;
+      case 'agents':
+        navigate('/agents');
         break;
       case 'code':
         navigate('/code');
@@ -217,12 +225,15 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[var(--color-bg-primary)]" data-testid="app-loading">
+      <div 
+        className="flex items-center justify-center h-screen bg-[var(--bg-void)]"
+        data-testid="app-loading"
+      >
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <div className="w-12 h-12 rounded-full border-2 border-neutral-200 border-t-neutral-800 animate-spin" />
+            <div className="w-12 h-12 rounded-full border-2 border-[var(--border-default)] border-t-[var(--teal-500)] animate-spin" />
           </div>
-          <p className="text-sm text-neutral-500 animate-pulse">Loading Codex...</p>
+          <p className="text-sm text-[var(--text-muted)] animate-pulse">Loading Codex...</p>
         </div>
       </div>
     );
@@ -230,20 +241,39 @@ function App() {
 
   return (
     <I18nProvider>
-      <div className="flex h-screen bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] overflow-hidden selection:bg-neutral-900 selection:text-white" data-testid="app-container">
+      <div 
+        className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
+        data-testid="app-container"
+      >
         <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
         
         <div className="flex-1 flex flex-col min-w-0">
-          <Header 
-            activeTab={activeTab}
-            agents={agents}
-            onSettingsClick={() => handleTabChange('settings')}
-          />
+          {activeTab !== 'chat' && (
+            <Header 
+              activeTab={activeTab}
+              agents={agents}
+              onSettingsClick={() => handleTabChange('settings')}
+            />
+          )}
           
-          <main className="flex-1 overflow-hidden animate-fadeIn" data-testid="main-content">
+          <main 
+            className={`flex-1 overflow-hidden animate-fadeIn ${activeTab === 'chat' ? '' : 'bg-[var(--bg-primary)]'}`}
+            data-testid="main-content"
+          >
             <Routes>
               <Route 
                 path="/" 
+                element={
+                  <WelcomeChat 
+                    agents={agents}
+                    providers={providers}
+                    skills={skills}
+                    onCreateAgent={handleCreateAgent}
+                  />
+                } 
+              />
+              <Route 
+                path="/agents" 
                 element={
                   <AgentPanel 
                     agents={agents}

@@ -1,38 +1,37 @@
 import React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
 
 const inputVariants = cva(
-  'flex w-full rounded-lg border border-neutral-200 bg-transparent px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200',
+  'flex w-full rounded-[var(--radius-md)] border bg-[var(--bg-elevated)] px-3.5 py-2.5 text-[13px] font-[var(--font-body)] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus-visible:outline-none focus-visible:border-[var(--teal-500)] focus-visible:shadow-[0_0_0_3px_rgba(0,158,136,0.15)] disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-[150ms]',
   {
     variants: {
       variant: {
-        default: 'focus:border-neutral-400',
-        error: 'border-red-300 focus:border-red-500 focus:ring-red-200',
-        success: 'border-green-300 focus:border-green-500 focus:ring-green-200',
+        default: 'border-[var(--border-subtle)]',
+        error: 'border-[rgba(232,90,106,0.3)] focus:border-[var(--error)] focus-visible:shadow-[0_0_0_3px_rgba(232,90,106,0.15)]',
+        success: 'border-[rgba(60,200,120,0.3)] focus:border-[var(--success)] focus-visible:shadow-[0_0_0_3px_rgba(60,200,120,0.15)]',
       },
-      size: {
+      inputSize: {
         default: 'h-10',
-        sm: 'h-8 text-xs',
-        lg: 'h-12 text-base',
+        sm: 'h-8 text-[11px] px-3',
+        lg: 'h-12 text-[14px] px-4',
       },
     },
     defaultVariants: {
       variant: 'default',
-      size: 'default',
+      inputSize: 'default',
     },
   }
 );
 
 export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement>,
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'>,
     VariantProps<typeof inputVariants> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, variant, size, ...props }, ref) => {
+  ({ className, variant, inputSize, ...props }, ref) => {
     return (
       <input
-        className={cn(inputVariants({ variant, size, className }))}
+        className={inputVariants({ variant, inputSize, className })}
         ref={ref}
         {...props}
       />

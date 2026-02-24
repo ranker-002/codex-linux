@@ -1,0 +1,405 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* --- Backgrounds --- */
+  --bg-void:     #030709;
+  --bg-primary:  #050A0C;
+  --bg-surface:  #080F12;
+  --bg-card:     #0A1318;
+  --bg-elevated: #0D1920;
+  --bg-hover:    #102028;
+  --bg-active:   #142830;
+
+  /* --- Borders --- */
+  --border-faint:  rgba(0,200,168,0.06);
+  --border-subtle: #102028;
+  --border-default:#1B3040;
+  --border-accent: rgba(0,200,168,0.25);
+
+  /* --- Accent Teal --- */
+  --teal-900:  #002822;
+  --teal-700:  #005C4E;
+  --teal-500:  #009E88;
+  --teal-400:  #00C4A6;
+  --teal-300:  #00DFC0;
+  --teal-200:  #7EEEDE;
+  --teal-100:  #B8F5EC;
+
+  /* --- Text --- */
+  --text-primary:   #D8EEE8;
+  --text-secondary: #7AADA0;
+  --text-muted:     #3E6860;
+  --text-disabled:  #1E3830;
+  --text-inverse:   #050A0C;
+
+  /* --- Semantic --- */
+  --success: #3CC878;
+  --warning: #E6B94A;
+  --error:   #E85A6A;
+  --info:    #6890F4;
+
+  /* --- Typographie --- */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* --- Spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* --- Radius --- */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-full: 999px;
+
+  /* --- Shadows --- */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 20px rgba(0,200,168,0.15);
+
+  /* --- Transitions --- */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* Scrollbar Abyss Teal */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--teal-700);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::selection {
+  background-color: var(--teal-500);
+  color: var(--bg-void);
+}
+
+:focus-visible {
+  outline: 2px solid var(--teal-400);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--teal-400);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--teal-300);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: all var(--transition-base);
+}
+
+input, textarea, select {
+  font-family: inherit;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+code, pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(0,200,168,0.2); }
+  50% { box-shadow: 0 0 20px rgba(0,200,168,0.4); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn var(--transition-base);
+}
+
+.animate-fadeUp {
+  animation: fadeUp 0.6s ease both;
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp var(--transition-base);
+}
+
+.animate-slideIn {
+  animation: slideIn var(--transition-base);
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* ===== UTILITY CLASSES ===== */
+.text-display {
+  font-family: var(--font-display);
+  font-style: italic;
+}
+
+.text-mono {
+  font-family: var(--font-mono);
+}
+
+/* Dot grid background */
+.dot-grid-bg {
+  background-image: radial-gradient(circle, rgba(0,200,168,0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Gradient backgrounds */
+.gradient-abyss {
+  background: linear-gradient(135deg, var(--bg-void) 0%, var(--bg-card) 50%, var(--bg-void) 100%);
+}
+
+/* Glow effects */
+.glow-teal {
+  box-shadow: 0 0 30px rgba(0,200,168,0.15);
+}
+
+.glow-teal-sm {
+  box-shadow: 0 0 15px rgba(0,200,168,0.1);
+}
+
+/* Glass effect */
+.glass-abyss {
+  background: rgba(10,19,24,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-faint);
+}
+
+/* ===== STATUS COLORS ===== */
+.status-idle { color: var(--warning); }
+.status-running { color: var(--success); }
+.status-paused { color: var(--warning); }
+.status-error { color: var(--error); }
+.status-completed { color: var(--info); }
+
+.status-idle-bg { background: var(--warning); }
+.status-running-bg { background: var(--success); }
+.status-paused-bg { background: var(--warning); }
+.status-error-bg { background: var(--error); }
+.status-completed-bg { background: var(--info); }
+
+/* ===== BADGE VARIANTS ===== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.badge-teal {
+  background: rgba(0,200,168,0.1);
+  border: 1px solid rgba(0,200,168,0.2);
+  color: var(--teal-300);
+}
+
+.badge-neutral {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+}
+
+.badge-success {
+  background: rgba(60,200,120,0.1);
+  border: 1px solid rgba(60,200,120,0.2);
+  color: var(--success);
+}
+
+.badge-warning {
+  background: rgba(230,185,74,0.1);
+  border: 1px solid rgba(230,185,74,0.2);
+  color: var(--warning);
+}
+
+.badge-error {
+  background: rgba(232,90,106,0.1);
+  border: 1px solid rgba(232,90,106,0.2);
+  color: var(--error);
+}
+
+.badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ===== TABS ===== */
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-elevated);
+  padding: 3px;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.tab:hover:not(.active) {
+  color: var(--text-secondary);
+}
+
+/* ===== PROGRESS BAR ===== */
+.progress-bar-bg {
+  height: 4px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--teal-700), var(--teal-400));
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 639px) {
+  .sidebar {
+    position: fixed;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  button, 
+  [role="button"],
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

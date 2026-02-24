@@ -5,11 +5,10 @@ import {
   Wrench, 
   Clock, 
   Settings,
-  ChevronRight,
   Code2,
-  ScrollText
+  ScrollText,
+  MessageSquare
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface SidebarProps {
   activeTab: string;
@@ -17,32 +16,31 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { id: 'agents', label: 'Agents', icon: Bot, description: 'Manage AI agents' },
-  { id: 'code', label: 'Code', icon: Code2, description: 'Code editor' },
-  { id: 'worktrees', label: 'Worktrees', icon: GitBranch, description: 'Git workspaces' },
-  { id: 'skills', label: 'Skills', icon: Wrench, description: 'Reusable prompts' },
-  { id: 'automations', label: 'Automations', icon: Clock, description: 'Scheduled tasks' },
-  { id: 'audit', label: 'Audit', icon: ScrollText, description: 'Activity log' },
+  { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'agents', label: 'Agents', icon: Bot },
+  { id: 'code', label: 'Code', icon: Code2 },
+  { id: 'worktrees', label: 'Worktrees', icon: GitBranch },
+  { id: 'skills', label: 'Skills', icon: Wrench },
+  { id: 'automations', label: 'Automations', icon: Clock },
+  { id: 'audit', label: 'Audit', icon: ScrollText },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   return (
-    <aside className="w-64 bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)] flex flex-col" data-testid="sidebar">
-      {/* Logo */}
-      <div className="p-6 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-neutral-900 rounded-lg flex items-center justify-center">
-            <Bot className="w-5 h-5 text-white" />
+    <aside 
+      className="w-[200px] bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col"
+      data-testid="sidebar"
+    >
+      <div className="p-4 border-b border-[var(--border-faint)]">
+        <div className="flex items-center gap-2">
+          <div className="w-[22px] h-[22px] bg-[var(--teal-500)] rounded-[6px] flex items-center justify-center">
+            <span className="text-[12px] font-bold text-[var(--bg-void)] font-[var(--font-body)]">C</span>
           </div>
-          <div>
-            <span className="font-semibold text-lg tracking-tight">Codex</span>
-            <span className="text-xs text-neutral-400 block">Linux</span>
-          </div>
+          <span className="font-medium text-[14px] text-[var(--text-primary)]">Codex</span>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto" data-testid="sidebar-nav">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" data-testid="sidebar-nav">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -51,47 +49,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group',
-                isActive 
-                  ? 'bg-neutral-900 text-white shadow-sm' 
-                  : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-              )}
+              className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-[var(--radius-sm)] text-[12px] transition-all duration-[150ms] ${
+                isActive
+                  ? 'bg-[rgba(0,200,168,0.08)] text-[var(--teal-300)] border-l-[2px] border-[var(--teal-500)] pl-[9px]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
+              }`}
               data-testid={`nav-${item.id}`}
             >
-              <Icon className={cn(
-                'w-4 h-4 transition-transform duration-200',
-                isActive ? '' : 'group-hover:scale-110'
-              )} />
-              <div className="flex-1 text-left">
-                <span className="block">{item.label}</span>
-                {!isActive && (
-                  <span className="text-xs text-neutral-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity">
-                    {item.description}
-                  </span>
-                )}
-              </div>
-              {isActive && (
-                <ChevronRight className="w-4 h-4 opacity-50" />
-              )}
+              <Icon className="w-3.5 h-3.5 opacity-50" />
+              <span>{item.label}</span>
             </button>
           );
         })}
       </nav>
 
-      {/* Settings */}
-      <div className="p-3 border-t border-[var(--color-border)]">
+      <div className="p-3 border-t border-[var(--border-faint)]">
         <button
           onClick={() => onTabChange('settings')}
-          className={cn(
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+          className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-[var(--radius-sm)] text-[12px] transition-all duration-[150ms] ${
             activeTab === 'settings'
-              ? 'bg-neutral-900 text-white' 
-              : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-          )}
+              ? 'bg-[rgba(0,200,168,0.08)] text-[var(--teal-300)] border-l-[2px] border-[var(--teal-500)] pl-[9px]'
+              : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-secondary)]'
+          }`}
           data-testid="nav-settings"
         >
-          <Settings className="w-4 h-4" />
+          <Settings className="w-3.5 h-3.5 opacity-50" />
           <span>Settings</span>
         </button>
       </div>

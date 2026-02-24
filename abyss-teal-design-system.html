@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abyss Teal — Identité Visuelle Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================
+   ABYSS TEAL — DESIGN SYSTEM
+   Claude Desktop Visual Identity
+   ============================================ */
+
+:root {
+  /* --- Backgrounds --- */
+  --bg-void:     #030709;   /* Plus sombre que le noir pur */
+  --bg-primary:  #050A0C;   /* Fond principal app */
+  --bg-surface:  #080F12;   /* Panneaux, sidebars */
+  --bg-card:     #0A1318;   /* Cards, modales */
+  --bg-elevated: #0D1920;   /* Éléments surélevés */
+  --bg-hover:    #102028;   /* Hover states */
+  --bg-active:   #142830;   /* Active / sélectionné */
+
+  /* --- Borders --- */
+  --border-faint:  rgba(0,200,168,0.06);
+  --border-subtle: #102028;
+  --border-default:#1B3040;
+  --border-accent: rgba(0,200,168,0.25);
+
+  /* --- Accent Teal --- */
+  --teal-900:  #002822;
+  --teal-700:  #005C4E;
+  --teal-500:  #009E88;   /* CTA, boutons */
+  --teal-400:  #00C4A6;   /* Accent principal */
+  --teal-300:  #00DFC0;   /* Highlights, focus */
+  --teal-200:  #7EEEDE;   /* Texte accent */
+  --teal-100:  #B8F5EC;   /* Glow, light */
+
+  /* --- Text --- */
+  --text-primary:   #D8EEE8;   /* Texte principal */
+  --text-secondary: #7AADA0;   /* Texte secondaire */
+  --text-muted:     #3E6860;   /* Métadonnées, labels */
+  --text-disabled:  #1E3830;   /* Désactivé */
+  --text-inverse:   #050A0C;   /* Sur fond clair */
+
+  /* --- Semantic --- */
+  --success: #3CC878;
+  --warning: #E6B94A;
+  --error:   #E85A6A;
+  --info:    #6890F4;
+
+  /* --- Typographie --- */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* --- Spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* --- Radius --- */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-full: 999px;
+}
+
+/* ============================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-void);
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* ---- Layout ---- */
+.page { max-width: 1100px; margin: 0 auto; padding: 0 48px 120px; }
+
+/* ---- Section ---- */
+.section { padding-top: 80px; }
+.section + .section { border-top: 1px solid var(--border-faint); margin-top: 20px; }
+
+/* ---- Section header ---- */
+.section-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal-500);
+  margin-bottom: 6px;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+.section-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 40px;
+  line-height: 1.7;
+}
+
+/* ---- Hero ---- */
+.hero {
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 64px 0 56px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-glow-a {
+  position: absolute;
+  width: 600px; height: 400px;
+  top: -120px; right: -100px;
+  background: radial-gradient(ellipse, rgba(0,200,168,0.09) 0%, transparent 65%);
+  pointer-events: none;
+}
+.hero-glow-b {
+  position: absolute;
+  width: 300px; height: 300px;
+  bottom: -80px; left: -60px;
+  background: radial-gradient(circle, rgba(0,150,130,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal-400);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-eyebrow::before {
+  content: '';
+  display: block;
+  width: 28px; height: 1px;
+  background: var(--teal-500);
+}
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  max-width: 700px;
+}
+.hero h1 em {
+  color: var(--teal-400);
+  font-style: italic;
+}
+.hero-meta {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.hero-meta span { display: flex; align-items: center; gap: 6px; }
+.hero-meta .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--teal-700); }
+
+/* ============================================================
+   COLOR SECTION
+   ============================================================ */
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 10px;
+  margin-bottom: 32px;
+}
+.color-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.color-group-title {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.color-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.swatch-card {
+  flex: 1;
+  min-width: 100px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-faint);
+}
+.swatch-body {
+  height: 72px;
+  position: relative;
+}
+.swatch-body.big { height: 120px; }
+.swatch-info {
+  background: var(--bg-card);
+  padding: 10px 12px;
+}
+.swatch-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+.swatch-hex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.swatch-role {
+  font-size: 9px;
+  color: var(--text-disabled);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* Teal scale strip */
+.teal-strip {
+  display: flex;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: 80px;
+  margin-bottom: 28px;
+}
+.teal-strip-segment {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 8px 10px;
+  position: relative;
+}
+.teal-strip-hex {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  opacity: 0.7;
+}
+.teal-strip-name {
+  font-size: 9px;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   TYPOGRAPHY SECTION
+   ============================================================ */
+.type-sample {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 36px 40px;
+  margin-bottom: 16px;
+}
+.type-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-faint);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.type-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.t-display {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.t-display em { color: var(--teal-400); }
+.t-heading-1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.t-heading-2 {
+  font-family: var(--font-body);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+.t-body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  font-weight: 400;
+}
+.t-small {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+.t-label {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--teal-500);
+}
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--teal-300);
+  line-height: 1.8;
+}
+.t-mono .kw { color: var(--teal-400); }
+.t-mono .str { color: var(--teal-200); }
+.t-mono .cm { color: var(--text-muted); }
+
+/* ============================================================
+   COMPONENTS
+   ============================================================ */
+.components-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.component-block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 28px 28px 32px;
+}
+.component-block.full { grid-column: 1 / -1; }
+.comp-label {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+/* Buttons */
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--teal-500);
+  color: var(--bg-void);
+  padding: 9px 18px;
+  font-size: 13px;
+}
+.btn-primary:hover { background: var(--teal-400); }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--teal-400);
+  border: 1px solid var(--border-accent);
+  padding: 8px 18px;
+  font-size: 13px;
+}
+.btn-secondary:hover { background: rgba(0,200,168,0.06); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+}
+.btn-icon {
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-elevated);
+  padding: 3px;
+  border-radius: 8px;
+  width: fit-content;
+  margin-bottom: 20px;
+}
+.tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.tab:hover:not(.active) { color: var(--text-secondary); }
+
+/* Input */
+.input-wrap { margin-bottom: 12px; }
+.input-label-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.input-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.input-hint { font-size: 10px; color: var(--text-muted); }
+
+.input {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input::placeholder { color: var(--text-disabled); }
+.input:focus {
+  border-color: var(--teal-500);
+  box-shadow: 0 0 0 3px rgba(0,158,136,0.15);
+}
+.input.focused {
+  border-color: var(--teal-500);
+  box-shadow: 0 0 0 3px rgba(0,158,136,0.15);
+}
+
+/* Chat input */
+.chat-input-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.chat-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  resize: none;
+  line-height: 1.5;
+}
+.chat-input-field::placeholder { color: var(--text-disabled); }
+.chat-btn {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--teal-500);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.chat-btn svg { width: 14px; height: 14px; fill: var(--bg-void); }
+
+/* Cards */
+.card-demo {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  transition: border-color 0.2s, transform 0.2s;
+  cursor: default;
+}
+.card-demo:hover {
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.cards-row {
+  display: flex;
+  gap: 10px;
+}
+.cards-row .card-demo { flex: 1; }
+
+/* File card */
+.file-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.file-card-top {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.file-card-meta { font-size: 10px; color: var(--text-muted); }
+.file-tag {
+  display: inline-flex;
+  padding: 2px 8px;
+  background: rgba(0,200,168,0.08);
+  border: 1px solid rgba(0,200,168,0.15);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--teal-400);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+/* Badge / Pill */
+.badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+}
+.badge-teal {
+  background: rgba(0,200,168,0.1);
+  border: 1px solid rgba(0,200,168,0.2);
+  color: var(--teal-300);
+}
+.badge-neutral {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+}
+.badge-success {
+  background: rgba(60,200,120,0.1);
+  border: 1px solid rgba(60,200,120,0.2);
+  color: #3CC878;
+}
+.badge-warning {
+  background: rgba(230,185,74,0.1);
+  border: 1px solid rgba(230,185,74,0.2);
+  color: #E6B94A;
+}
+.badge-error {
+  background: rgba(232,90,106,0.1);
+  border: 1px solid rgba(232,90,106,0.2);
+  color: #E85A6A;
+}
+.badge-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Progress */
+.progress-row { display: flex; flex-direction: column; gap: 12px; }
+.progress-item { display: flex; flex-direction: column; gap: 5px; }
+.progress-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.progress-bar-bg {
+  height: 4px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--teal-700), var(--teal-400));
+}
+
+/* Sidebar mini */
+.sidebar-demo {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  width: 100%;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: default;
+  transition: all 0.15s;
+  margin-bottom: 2px;
+}
+.sidebar-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.sidebar-item.active {
+  background: rgba(0,200,168,0.08);
+  color: var(--teal-300);
+  border-left: 2px solid var(--teal-500);
+  margin-left: -1px;
+  padding-left: 9px;
+}
+.sidebar-icon {
+  width: 14px; height: 14px;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   APP MOCKUP
+   ============================================================ */
+.app-full {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  height: 480px;
+  position: relative;
+}
+.app-full::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(0,200,168,0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+  pointer-events: none;
+  z-index: 0;
+}
+.app-sidebar {
+  width: 200px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.app-sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-faint);
+}
+.logo-mark {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  background: var(--teal-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.logo-mark::after {
+  content: 'C';
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bg-void);
+  font-family: var(--font-body);
+}
+.logo-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+}
+.app-topbar {
+  height: 48px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 4px;
+}
+.app-content {
+  flex: 1;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+.app-welcome {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-primary);
+}
+.app-suggestions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex: 1;
+}
+.app-suggestion {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.sugg-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: rgba(0,200,168,0.08);
+  border: 1px solid rgba(0,200,168,0.12);
+  flex-shrink: 0;
+}
+.app-input-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.app-input-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-disabled);
+}
+.app-send {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  background: var(--teal-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-panel {
+  width: 240px;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  padding: 16px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.panel-title {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.panel-file {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.panel-file small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   SPACING & GRID
+   ============================================================ */
+.spacing-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.sp-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.sp-block {
+  background: var(--teal-700);
+  opacity: 0.7;
+  border-radius: 3px;
+  height: 16px;
+}
+.sp-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* Radius showcase */
+.radius-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.radius-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.radius-box {
+  width: 64px; height: 64px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+}
+.radius-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); text-align: center; }
+
+/* ============================================================
+   EFFECTS
+   ============================================================ */
+.effects-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.effect-box {
+  height: 120px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-faint);
+  position: relative;
+  overflow: hidden;
+}
+.dot-grid-demo {
+  background: var(--bg-primary);
+  background-image: radial-gradient(circle, rgba(0,200,168,0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.glow-demo {
+  background: var(--bg-primary);
+}
+.glow-demo::before {
+  content: '';
+  position: absolute;
+  width: 140px; height: 140px;
+  background: radial-gradient(circle, rgba(0,200,168,0.2), transparent 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.gradient-demo {
+  background: linear-gradient(135deg, #050A0C 0%, #0A1D20 50%, #050A0C 100%);
+}
+
+/* ============================================================
+   CSS VARIABLES REFERENCE
+   ============================================================ */
+.vars-block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 2;
+}
+.vars-section-title {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--teal-500);
+  margin-bottom: 8px;
+  margin-top: 20px;
+}
+.vars-section-title:first-child { margin-top: 0; }
+.v-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; margin-bottom: 8px; }
+.v-n { color: #3A9080; }
+.v-v { color: var(--text-secondary); }
+.v-c { color: var(--text-muted); }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.section { animation: fadeUp 0.6s ease both; }
+.section:nth-child(1) { animation-delay: 0s; }
+.section:nth-child(2) { animation-delay: 0.05s; }
+.section:nth-child(3) { animation-delay: 0.1s; }
+.section:nth-child(4) { animation-delay: 0.15s; }
+.section:nth-child(5) { animation-delay: 0.2s; }
+.section:nth-child(6) { animation-delay: 0.25s; }
+.section:nth-child(7) { animation-delay: 0.3s; }
+.section:nth-child(8) { animation-delay: 0.35s; }
+
+/* Responsive */
+@media(max-width:800px){
+  .page { padding: 0 20px 60px; }
+  .components-grid, .type-pair, .v-grid, .effects-grid, .app-suggestions { grid-template-columns: 1fr; }
+  .app-panel, .app-sidebar { display: none; }
+  .app-full { height: 320px; }
+  .teal-strip { flex-wrap: wrap; height: auto; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ============ HERO ============ -->
+<div class="section hero">
+  <div class="hero-glow-a"></div>
+  <div class="hero-glow-b"></div>
+  <div class="hero-eyebrow">Abyss Teal — Design System</div>
+  <h1>L'identité visuelle<br>de <em>Claude</em> redéfinie</h1>
+  <div class="hero-meta">
+    <span><div class="dot"></div>Version 1.0</span>
+    <span><div class="dot"></div>Dark UI</span>
+    <span><div class="dot"></div>Claude Desktop</span>
+    <span><div class="dot"></div>2026</span>
+  </div>
+</div>
+
+<!-- ============ COULEURS ============ -->
+<div class="section">
+  <div class="section-label">01 — Couleurs</div>
+  <div class="section-title">La palette Abyss Teal</div>
+  <div class="section-sub">Une gamme chromatique construite autour du noir abyssal et du teal bioluminescent. Chaque teinte a un rôle fonctionnel précis.</div>
+
+  <!-- Teal scale strip -->
+  <div class="teal-strip">
+    <div class="teal-strip-segment" style="background:#002822"><div class="teal-strip-hex" style="color:rgba(255,255,255,0.5)">#002822</div><div class="teal-strip-name" style="color:rgba(255,255,255,0.3)">900</div></div>
+    <div class="teal-strip-segment" style="background:#003D34"><div class="teal-strip-hex" style="color:rgba(255,255,255,0.5)">#003D34</div><div class="teal-strip-name" style="color:rgba(255,255,255,0.3)">800</div></div>
+    <div class="teal-strip-segment" style="background:#005C4E"><div class="teal-strip-hex" style="color:rgba(255,255,255,0.6)">#005C4E</div><div class="teal-strip-name" style="color:rgba(255,255,255,0.4)">700</div></div>
+    <div class="teal-strip-segment" style="background:#007A68"><div class="teal-strip-hex" style="color:rgba(255,255,255,0.7)">#007A68</div><div class="teal-strip-name" style="color:rgba(255,255,255,0.5)">600</div></div>
+    <div class="teal-strip-segment" style="background:#009E88"><div class="teal-strip-hex">#009E88</div><div class="teal-strip-name">500 — CTA</div></div>
+    <div class="teal-strip-segment" style="background:#00C4A6"><div class="teal-strip-hex" style="color:rgba(0,0,0,0.6)">#00C4A6</div><div class="teal-strip-name" style="color:rgba(0,0,0,0.45)">400</div></div>
+    <div class="teal-strip-segment" style="background:#00DFC0"><div class="teal-strip-hex" style="color:rgba(0,0,0,0.6)">#00DFC0</div><div class="teal-strip-name" style="color:rgba(0,0,0,0.45)">300</div></div>
+    <div class="teal-strip-segment" style="background:#7EEEDE"><div class="teal-strip-hex" style="color:rgba(0,0,0,0.5)">#7EEEDE</div><div class="teal-strip-name" style="color:rgba(0,0,0,0.35)">200</div></div>
+    <div class="teal-strip-segment" style="background:#B8F5EC"><div class="teal-strip-hex" style="color:rgba(0,0,0,0.45)">#B8F5EC</div><div class="teal-strip-name" style="color:rgba(0,0,0,0.3)">100</div></div>
+  </div>
+
+  <!-- Background swatches -->
+  <div style="margin-bottom:8px;font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);font-weight:500">Backgrounds</div>
+  <div class="color-row">
+    <div class="swatch-card"><div class="swatch-body big" style="background:#030709"></div><div class="swatch-info"><div class="swatch-name">Void</div><div class="swatch-hex">#030709</div><div class="swatch-role">--bg-void</div></div></div>
+    <div class="swatch-card"><div class="swatch-body big" style="background:#050A0C"></div><div class="swatch-info"><div class="swatch-name">Primary</div><div class="swatch-hex">#050A0C</div><div class="swatch-role">--bg-primary</div></div></div>
+    <div class="swatch-card"><div class="swatch-body big" style="background:#080F12"></div><div class="swatch-info"><div class="swatch-name">Surface</div><div class="swatch-hex">#080F12</div><div class="swatch-role">--bg-surface</div></div></div>
+    <div class="swatch-card"><div class="swatch-body big" style="background:#0A1318"></div><div class="swatch-info"><div class="swatch-name">Card</div><div class="swatch-hex">#0A1318</div><div class="swatch-role">--bg-card</div></div></div>
+    <div class="swatch-card"><div class="swatch-body big" style="background:#0D1920"></div><div class="swatch-info"><div class="swatch-name">Elevated</div><div class="swatch-hex">#0D1920</div><div class="swatch-role">--bg-elevated</div></div></div>
+    <div class="swatch-card"><div class="swatch-body big" style="background:#102028"></div><div class="swatch-info"><div class="swatch-name">Hover</div><div class="swatch-hex">#102028</div><div class="swatch-role">--bg-hover</div></div></div>
+    <div class="swatch-card"><div class="swatch-body big" style="background:#142830"></div><div class="swatch-info"><div class="swatch-name">Active</div><div class="swatch-hex">#142830</div><div class="swatch-role">--bg-active</div></div></div>
+  </div>
+
+  <!-- Text swatches -->
+  <div style="margin-bottom:8px;font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);font-weight:500;margin-top:8px">Texte</div>
+  <div class="color-row">
+    <div class="swatch-card"><div class="swatch-body" style="background:#D8EEE8"></div><div class="swatch-info"><div class="swatch-name">Primary</div><div class="swatch-hex">#D8EEE8</div></div></div>
+    <div class="swatch-card"><div class="swatch-body" style="background:#7AADA0"></div><div class="swatch-info"><div class="swatch-name">Secondary</div><div class="swatch-hex">#7AADA0</div></div></div>
+    <div class="swatch-card"><div class="swatch-body" style="background:#3E6860"></div><div class="swatch-info"><div class="swatch-name">Muted</div><div class="swatch-hex">#3E6860</div></div></div>
+    <div class="swatch-card"><div class="swatch-body" style="background:#1E3830"></div><div class="swatch-info"><div class="swatch-name">Disabled</div><div class="swatch-hex">#1E3830</div></div></div>
+  </div>
+
+  <!-- Semantic -->
+  <div style="margin-bottom:8px;font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);font-weight:500;margin-top:8px">Sémantique</div>
+  <div class="color-row">
+    <div class="swatch-card"><div class="swatch-body" style="background:#3CC878"></div><div class="swatch-info"><div class="swatch-name">Success</div><div class="swatch-hex">#3CC878</div></div></div>
+    <div class="swatch-card"><div class="swatch-body" style="background:#E6B94A"></div><div class="swatch-info"><div class="swatch-name">Warning</div><div class="swatch-hex">#E6B94A</div></div></div>
+    <div class="swatch-card"><div class="swatch-body" style="background:#E85A6A"></div><div class="swatch-info"><div class="swatch-name">Error</div><div class="swatch-hex">#E85A6A</div></div></div>
+    <div class="swatch-card"><div class="swatch-body" style="background:#6890F4"></div><div class="swatch-info"><div class="swatch-name">Info</div><div class="swatch-hex">#6890F4</div></div></div>
+  </div>
+</div>
+
+<!-- ============ TYPOGRAPHIE ============ -->
+<div class="section">
+  <div class="section-label">02 — Typographie</div>
+  <div class="section-title">Système typographique</div>
+  <div class="section-sub">Fraunces (display serif italique) pour les titres expressifs — DM Sans pour les corps de texte — JetBrains Mono pour le code.</div>
+
+  <div class="type-sample">
+    <div class="t-display">Let's knock something<br>off your <em>list</em></div>
+    <div class="type-meta">
+      <span>Fraunces — Italic 300</span>
+      <span>52px / -0.02em / line-height 1.05</span>
+      <span>var(--font-display)</span>
+    </div>
+  </div>
+
+  <div class="type-pair">
+    <div class="type-sample">
+      <div class="t-heading-1">Agents · Projects · Chats</div>
+      <div class="type-meta">
+        <span>Fraunces 300</span>
+        <span>28px / -0.01em</span>
+      </div>
+    </div>
+    <div class="type-sample">
+      <div class="t-heading-2">Implementation Plan · Feature Spec</div>
+      <div class="type-meta">
+        <span>DM Sans 500</span>
+        <span>18px / -0.005em</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="type-pair">
+    <div class="type-sample">
+      <div class="t-body">Claude is an AI assistant designed to help you think more clearly, write better, build faster. Every interaction is a collaboration between your intentions and a powerful language model.</div>
+      <div class="type-meta">
+        <span>DM Sans 400</span>
+        <span>14px / line-height 1.7</span>
+      </div>
+    </div>
+    <div class="type-sample">
+      <div class="t-label" style="margin-bottom:12px">Only you · Files · Memory</div>
+      <div class="t-small">Last message 1 month ago — Sonnet 4.5</div>
+      <div class="type-meta">
+        <span>Label 10px / 500 / 0.15em UC</span>
+        <span>Small 12px / 400</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="type-sample">
+    <div class="t-mono"><span class="kw">const</span> claude = <span class="kw">await</span> anthropic.messages.create({<br>&nbsp;&nbsp;model: <span class="str">"claude-sonnet-4-6"</span>,<br>&nbsp;&nbsp;max_tokens: <span class="str">1024</span>,<br>&nbsp;&nbsp;<span class="cm">// Your prompt here</span><br>});</div>
+    <div class="type-meta">
+      <span>JetBrains Mono 400</span>
+      <span>13px / line-height 1.8</span>
+      <span>var(--font-mono)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ COMPOSANTS ============ -->
+<div class="section">
+  <div class="section-label">03 — Composants</div>
+  <div class="section-title">Bibliothèque UI</div>
+  <div class="section-sub">Tous les composants partagent le même language visuel : bords légers, states subtils, accent teal cohérent.</div>
+
+  <div class="components-grid">
+
+    <!-- Buttons -->
+    <div class="component-block">
+      <div class="comp-label">Boutons</div>
+      <div class="btn-row" style="margin-bottom:12px">
+        <button class="btn btn-primary">Let's go →</button>
+        <button class="btn btn-secondary">New project</button>
+        <button class="btn btn-ghost">Cancel</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-sm">Send</button>
+        <button class="btn btn-secondary btn-sm">Upload</button>
+        <button class="btn btn-ghost btn-sm">View all</button>
+        <button class="btn btn-icon">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><line x1="7" y1="4" x2="7" y2="7"/><circle cx="7" cy="9.5" r="0.5" fill="currentColor" stroke="none"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs + Badges -->
+    <div class="component-block">
+      <div class="comp-label">Tabs & Badges</div>
+      <div class="tabs">
+        <div class="tab">Chat</div>
+        <div class="tab active">Cowork</div>
+        <div class="tab">Code</div>
+      </div>
+      <div class="badge-row">
+        <span class="badge badge-teal"><span class="badge-dot"></span>Active</span>
+        <span class="badge badge-success"><span class="badge-dot"></span>Done</span>
+        <span class="badge badge-warning"><span class="badge-dot"></span>Pending</span>
+        <span class="badge badge-error"><span class="badge-dot"></span>Error</span>
+        <span class="badge badge-neutral">Draft</span>
+      </div>
+    </div>
+
+    <!-- Inputs -->
+    <div class="component-block">
+      <div class="comp-label">Inputs</div>
+      <div class="input-wrap">
+        <div class="input-label-row">
+          <span class="input-label">Project name</span>
+          <span class="input-hint">Required</span>
+        </div>
+        <input class="input focused" type="text" value="Feedbuilder project setup" />
+      </div>
+      <div class="input-wrap">
+        <div class="input-label-row">
+          <span class="input-label">Description</span>
+        </div>
+        <input class="input" type="text" placeholder="Add a description..." />
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div class="component-block">
+      <div class="comp-label">Cards</div>
+      <div class="cards-row" style="margin-bottom:10px">
+        <div class="card-demo">
+          <div class="card-title">Cursor setup for project</div>
+          <div class="card-meta">Last message 1 month ago</div>
+        </div>
+        <div class="card-demo">
+          <div class="card-title">Feedbuilder project setup</div>
+          <div class="card-meta">Last message 1 month ago</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="file-card" style="flex:1">
+          <div class="file-card-top">Project Constitution v4</div>
+          <div class="file-card-meta">491 lines</div>
+          <div class="file-tag">TEXT</div>
+        </div>
+        <div class="file-card" style="flex:1">
+          <div class="file-card-top">Task Breakdown</div>
+          <div class="file-card-meta">566 lines</div>
+          <div class="file-tag">TEXT</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="component-block">
+      <div class="comp-label">Progress</div>
+      <div class="progress-row">
+        <div class="progress-item">
+          <div class="progress-label-row"><span>Project capacity</span><span style="color:var(--teal-400)">2%</span></div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:2%"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="progress-label-row"><span>Memory used</span><span style="color:var(--teal-400)">38%</span></div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:38%"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="progress-label-row"><span>Context window</span><span style="color:var(--warning)">76%</span></div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:76%;background:linear-gradient(90deg,var(--teal-700),var(--warning))"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="component-block">
+      <div class="comp-label">Sidebar Navigation</div>
+      <div class="sidebar-demo">
+        <div class="sidebar-item active"><div class="sidebar-icon"></div>Agents</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div>Chats</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div>Projects</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div>Artifacts</div>
+        <div style="height:8px;border-bottom:1px solid var(--border-faint);margin-bottom:8px"></div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div>Houtini Website</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div>MCP Development</div>
+        <div class="sidebar-item"><div class="sidebar-icon"></div>WordPress Dev</div>
+      </div>
+    </div>
+
+    <!-- Chat Input -->
+    <div class="component-block full">
+      <div class="comp-label">Chat Input</div>
+      <div class="chat-input-wrap">
+        <textarea class="chat-input-field" rows="2" placeholder="How can I help you today?"></textarea>
+        <div class="chat-btn">
+          <svg viewBox="0 0 16 16"><path d="M2 8l12-6-5 6 5 6-12-6z"/></svg>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============ APP MOCKUP ============ -->
+<div class="section">
+  <div class="section-label">04 — Application</div>
+  <div class="section-title">Interface complète</div>
+  <div class="section-sub">L'identité Abyss Teal appliquée à l'interface Claude Desktop — sidebar, contenu principal et panneau de fichiers.</div>
+
+  <div class="app-full">
+    <!-- Sidebar -->
+    <div class="app-sidebar">
+      <div class="app-sidebar-logo">
+        <div class="logo-mark"></div>
+        <div class="logo-name">Claude</div>
+      </div>
+      <div class="sidebar-item"><div class="sidebar-icon" style="width:12px;height:12px"></div>Chats</div>
+      <div class="sidebar-item active"><div class="sidebar-icon" style="width:12px;height:12px"></div>Projects</div>
+      <div class="sidebar-item"><div class="sidebar-icon" style="width:12px;height:12px"></div>Artifacts</div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-faint)"></div>
+      <div class="sidebar-item" style="font-size:11px"><div class="sidebar-icon" style="width:10px;height:10px"></div>Agents</div>
+      <div class="sidebar-item" style="font-size:11px"><div class="sidebar-icon" style="width:10px;height:10px"></div>Houtini Website</div>
+      <div class="sidebar-item" style="font-size:11px"><div class="sidebar-icon" style="width:10px;height:10px"></div>WordPress Dev</div>
+      <div class="sidebar-item" style="font-size:11px"><div class="sidebar-icon" style="width:10px;height:10px"></div>MCP Development</div>
+    </div>
+    <!-- Main -->
+    <div class="app-main">
+      <div class="app-topbar">
+        <div class="tabs" style="margin-bottom:0">
+          <div class="tab">Chat</div>
+          <div class="tab active">Cowork</div>
+          <div class="tab">Code</div>
+        </div>
+      </div>
+      <div class="app-content">
+        <div class="app-welcome">Let's knock something<br>off your list</div>
+        <div class="app-suggestions">
+          <div class="app-suggestion"><div class="sugg-icon"></div>Optimize my workflow</div>
+          <div class="app-suggestion"><div class="sugg-icon"></div>Organize my files</div>
+          <div class="app-suggestion"><div class="sugg-icon"></div>Find insights in data</div>
+          <div class="app-suggestion"><div class="sugg-icon"></div>Build an automation</div>
+        </div>
+        <div class="app-input-row">
+          <div class="app-input-text">How can I help you today?</div>
+          <div class="app-send">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="var(--bg-void)"><path d="M1 6l9-4-3.5 4L10 10 1 6z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Panel -->
+    <div class="app-panel">
+      <div class="panel-title">Memory</div>
+      <div class="panel-file">Purpose & context<br><small>Only you · Updated 14 days ago</small></div>
+      <div class="panel-title">Files</div>
+      <div class="panel-file">Project Constitution v4<br><small>491 lines · TEXT</small></div>
+      <div class="panel-file">Task Breakdown<br><small>566 lines · TEXT</small></div>
+      <div class="panel-file">Implementation Plan<br><small>390 lines · TEXT</small></div>
+      <div style="margin-top:4px">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:2%"></div></div>
+        <div style="font-size:9px;color:var(--text-muted);margin-top:4px">2% of project capacity</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ EFFETS ============ -->
+<div class="section">
+  <div class="section-label">05 — Effets & Textures</div>
+  <div class="section-title">Atmosphère visuelle</div>
+  <div class="section-sub">Trois effets à combiner pour créer la profondeur caractéristique de l'identité Abyss Teal.</div>
+
+  <div class="effects-grid">
+    <div class="effect-box dot-grid-demo">Dot Grid<br><span style="font-size:9px;display:block;margin-top:4px;opacity:0.5">radial-gradient 22px</span></div>
+    <div class="effect-box glow-demo">Ambient Glow<br><span style="font-size:9px;display:block;margin-top:4px;opacity:0.5">teal-400 · 20% opacity</span></div>
+    <div class="effect-box gradient-demo">Subtle Gradient<br><span style="font-size:9px;display:block;margin-top:4px;opacity:0.5">135deg · void → card</span></div>
+  </div>
+
+  <!-- Spacing -->
+  <div style="margin-top:40px;margin-bottom:12px" class="comp-label">Espacement (base 4px)</div>
+  <div class="spacing-row">
+    <div class="sp-item"><div class="sp-block" style="width:4px"></div><div class="sp-label">4px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:8px"></div><div class="sp-label">8px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:12px"></div><div class="sp-label">12px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:16px"></div><div class="sp-label">16px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:20px"></div><div class="sp-label">20px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:24px"></div><div class="sp-label">24px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:32px"></div><div class="sp-label">32px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:40px"></div><div class="sp-label">40px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:48px"></div><div class="sp-label">48px</div></div>
+    <div class="sp-item"><div class="sp-block" style="width:64px"></div><div class="sp-label">64px</div></div>
+  </div>
+
+  <!-- Radius -->
+  <div style="margin-bottom:12px" class="comp-label">Border Radius</div>
+  <div class="radius-row">
+    <div class="radius-item"><div class="radius-box" style="border-radius:6px"></div><div class="radius-label">sm<br>6px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:10px"></div><div class="radius-label">md<br>10px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:14px"></div><div class="radius-label">lg<br>14px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:20px"></div><div class="radius-label">xl<br>20px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:999px"></div><div class="radius-label">full<br>999px</div></div>
+  </div>
+</div>
+
+<!-- ============ VARIABLES CSS ============ -->
+<div class="section">
+  <div class="section-label">06 — Code</div>
+  <div class="section-title">Variables CSS complètes</div>
+  <div class="section-sub">Copier-coller ces variables dans tout projet utilisant l'identité Abyss Teal.</div>
+
+  <div class="vars-block">
+    <div class="vars-section-title">/* Backgrounds */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--bg-void:</span> <span class="v-v">#030709;</span></div>
+      <div><span class="v-n">--bg-elevated:</span> <span class="v-v">#0D1920;</span></div>
+      <div><span class="v-n">--bg-primary:</span> <span class="v-v">#050A0C;</span></div>
+      <div><span class="v-n">--bg-hover:</span> <span class="v-v">#102028;</span></div>
+      <div><span class="v-n">--bg-surface:</span> <span class="v-v">#080F12;</span></div>
+      <div><span class="v-n">--bg-active:</span> <span class="v-v">#142830;</span></div>
+      <div><span class="v-n">--bg-card:</span> <span class="v-v">#0A1318;</span></div>
+    </div>
+
+    <div class="vars-section-title">/* Borders */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--border-faint:</span> <span class="v-v">rgba(0,200,168,0.06);</span></div>
+      <div><span class="v-n">--border-accent:</span> <span class="v-v">rgba(0,200,168,0.25);</span></div>
+      <div><span class="v-n">--border-subtle:</span> <span class="v-v">#102028;</span></div>
+      <div><span class="v-n">--border-default:</span> <span class="v-v">#1B3040;</span></div>
+    </div>
+
+    <div class="vars-section-title">/* Accent Teal Scale */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--teal-900:</span> <span class="v-v">#002822;</span></div>
+      <div><span class="v-n">--teal-400:</span> <span class="v-v">#00C4A6;</span></div>
+      <div><span class="v-n">--teal-700:</span> <span class="v-v">#005C4E;</span></div>
+      <div><span class="v-n">--teal-300:</span> <span class="v-v">#00DFC0;</span></div>
+      <div><span class="v-n">--teal-500:</span> <span class="v-v">#009E88; /* CTA */</span></div>
+      <div><span class="v-n">--teal-100:</span> <span class="v-v">#B8F5EC;</span></div>
+    </div>
+
+    <div class="vars-section-title">/* Text */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--text-primary:</span> <span class="v-v">#D8EEE8;</span></div>
+      <div><span class="v-n">--text-muted:</span> <span class="v-v">#3E6860;</span></div>
+      <div><span class="v-n">--text-secondary:</span> <span class="v-v">#7AADA0;</span></div>
+      <div><span class="v-n">--text-disabled:</span> <span class="v-v">#1E3830;</span></div>
+    </div>
+
+    <div class="vars-section-title">/* Semantic */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--success:</span> <span class="v-v">#3CC878;</span></div>
+      <div><span class="v-n">--error:</span> <span class="v-v">#E85A6A;</span></div>
+      <div><span class="v-n">--warning:</span> <span class="v-v">#E6B94A;</span></div>
+      <div><span class="v-n">--info:</span> <span class="v-v">#6890F4;</span></div>
+    </div>
+
+    <div class="vars-section-title">/* Typography */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--font-display:</span> <span class="v-v">'Fraunces', Georgia, serif;</span></div>
+      <div><span class="v-n">--font-mono:</span> <span class="v-v">'JetBrains Mono', monospace;</span></div>
+      <div><span class="v-n">--font-body:</span> <span class="v-v">'DM Sans', system-ui, sans-serif;</span></div>
+    </div>
+
+    <div class="vars-section-title">/* Spacing (base 4px) */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--space-1:</span> <span class="v-v">4px; </span><span class="v-c">/* --space-6: 24px */</span></div>
+      <div><span class="v-n">--space-8:</span> <span class="v-v">32px;</span></div>
+      <div><span class="v-n">--space-2:</span> <span class="v-v">8px; </span><span class="v-c">/* --space-10: 40px */</span></div>
+      <div><span class="v-n">--space-12:</span> <span class="v-v">48px;</span></div>
+      <div><span class="v-n">--space-4:</span> <span class="v-v">16px;</span></div>
+      <div><span class="v-n">--space-16:</span> <span class="v-v">64px;</span></div>
+    </div>
+
+    <div class="vars-section-title">/* Border Radius */</div>
+    <div class="v-grid">
+      <div><span class="v-n">--radius-sm:</span> <span class="v-v">6px;</span></div>
+      <div><span class="v-n">--radius-lg:</span> <span class="v-v">14px;</span></div>
+      <div><span class="v-n">--radius-md:</span> <span class="v-v">10px;</span></div>
+      <div><span class="v-n">--radius-xl:</span> <span class="v-v">20px;</span></div>
+      <div><span class="v-n">--radius-full:</span> <span class="v-v">999px;</span></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
