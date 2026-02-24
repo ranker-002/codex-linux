@@ -1,0 +1,42 @@
+{
+  "name": "codex-linux",
+  "version": "1.0.0",
+  "description": "Multi-agent AI coding command center for Linux",
+  "main": "./lib/download.js",
+  "bin": {
+    "codex-linux": "./bin/codex-linux"
+  },
+  "scripts": {
+    "postinstall": "node lib/download.js",
+    "test": "echo \"No tests\" && exit 0"
+  },
+  "keywords": [
+    "codex",
+    "ai",
+    "coding",
+    "agent",
+    "electron",
+    "linux"
+  ],
+  "author": "Codex Linux Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ranker-org/codex-linux-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ranker-org/codex-linux-app/issues"
+  },
+  "homepage": "https://github.com/ranker-org/codex-linux-app#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "dependencies": {}
+}
