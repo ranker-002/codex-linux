@@ -74,7 +74,6 @@ export class SecurityManager {
     
     const authTag = (cipher as any).getAuthTag();
     
-    // Return IV + authTag + encrypted data
     return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
   }
 
@@ -125,7 +124,6 @@ export class SecurityManager {
     throw new Error('Key rotation with data re-encryption is not yet implemented. All encrypted data will become unreadable after key rotation. Manual intervention required.');
   }
 
-  // Secure comparison to prevent timing attacks
   secureCompare(a: string, b: string): boolean {
     if (a.length !== b.length) {
       return false;
