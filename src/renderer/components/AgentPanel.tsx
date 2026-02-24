@@ -37,10 +37,12 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
   const [newAgentConfig, setNewAgentConfig] = useState({
     name: '',
     projectPath: '',
-    providerId: providers[0]?.id || '',
+    providerId: '',
     model: '',
     skills: [] as string[]
   });
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const selectedAgentChanges = useMemo(() => {
     if (!selectedAgent) return [];
@@ -83,6 +85,16 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
     void refreshQueue(selectedAgent.id);
     void refreshQueueHistory(selectedAgent.id);
   }, [selectedAgent?.id]);
+
+  useEffect(() => {
+    if (providers.length > 0 && !newAgentConfig.providerId) {
+      setNewAgentConfig(prev => ({
+        ...prev,
+        providerId: providers[0].id,
+        model: providers[0].models[0]?.id || ''
+      }));
+    }
+  }, [providers]);
 
   useEffect(() => {
     const onTaskStarted = (event: any, payload: { agentId: string }) => {
@@ -195,6 +207,22 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
   }, [selectedAgent?.id]);
 
   const handleCreateAgent = async () => {
+    if (!newAgentConfig.name.trim()) {
+      setCreateError('Agent name is required');
+      return;
+    }
+    if (!newAgentConfig.projectPath.trim()) {
+      setCreateError('Project path is required');
+      return;
+    }
+    if (!newAgentConfig.model) {
+      setCreateError('Please select a model');
+      return;
+    }
+    
+    setCreateError(null);
+    setIsCreating(true);
+    
     try {
       await onCreateAgent(newAgentConfig);
       setShowCreateModal(false);
@@ -202,11 +230,14 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
         name: '',
         projectPath: '',
         providerId: providers[0]?.id || '',
-        model: '',
+        model: providers[0]?.models[0]?.id || '',
         skills: []
       });
     } catch (error) {
       console.error('Failed to create agent:', error);
+      setCreateError(error instanceof Error ? error.message : 'Failed to create agent');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -706,19 +737,35 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
               </div>
             </div>
 
+            {createError && (
+              <div className="mt-4 p-3 bg-[rgba(232,90,106,0.1)] border border-[rgba(232,90,106,0.3)] rounded-[var(--radius-md)]">
+                <p className="text-[12px] text-[var(--error)]">{createError}</p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 mt-6">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setCreateError(null);
+                }}
                 className="px-4 py-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-[13px] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateAgent}
-                disabled={!newAgentConfig.name || !newAgentConfig.projectPath}
-                className="px-4 py-2 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-sm)] hover:bg-[var(--teal-400)] disabled:opacity-50 text-[13px] font-medium transition-colors"
+                disabled={isCreating || !newAgentConfig.name || !newAgentConfig.projectPath}
+                className="px-4 py-2 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-sm)] hover:bg-[var(--teal-400)] disabled:opacity-50 text-[13px] font-medium transition-colors flex items-center gap-2"
               >
-                Create Agent
+                {isCreating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-[var(--bg-void)] border-t-transparent rounded-full animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Agent'
+                )}
               </button>
             </div>
           </div>
