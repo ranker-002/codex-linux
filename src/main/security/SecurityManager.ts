@@ -3,6 +3,8 @@ import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
+const API_KEYS = new Set<string>();
+
 export class SecurityManager {
   private algorithm = 'aes-256-gcm';
   private keyFile: string;
@@ -14,15 +16,39 @@ export class SecurityManager {
 
   async initialize(): Promise<void> {
     try {
-      // Try to load existing key
       const keyData = await fs.readFile(this.keyFile);
       this.masterKey = keyData;
     } catch {
-      // Generate new key if doesn't exist
       this.masterKey = crypto.randomBytes(32);
       await fs.mkdir(path.dirname(this.keyFile), { recursive: true });
       await fs.writeFile(this.keyFile, this.masterKey, { mode: 0o600 });
     }
+    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.json');
+    try {
+      const data = await fs.readFile(apiKeysPath, 'utf-8');
+      const keys = JSON.parse(data) as string[];
+      keys.forEach((k) => API_KEYS.add(k));
+    } catch {
+      const defaultKey = crypto.randomBytes(32).toString('hex');
+      API_KEYS.add(defaultKey);
+      await fs.writeFile(apiKeysPath, JSON.stringify([defaultKey]), { mode: 0o600 });
+    }
+  }
+
+  async validateApiKey(apiKey: string): Promise<boolean> {
+    return API_KEYS.has(apiKey);
+  }
+
+  async addApiKey(apiKey: string): Promise<void> {
+    API_KEYS.add(apiKey);
+    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.json');
+    await fs.writeFile(apiKeysPath, JSON.stringify([...API_KEYS]), { mode: 0o600 });
+  }
+
+  async removeApiKey(apiKey: string): Promise<void> {
+    API_KEYS.delete(apiKey);
+    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.json');
+    await fs.writeFile(apiKeysPath, JSON.stringify([...API_KEYS]), { mode: 0o600 });
   }
 
   encrypt(text: string): string {
@@ -74,20 +100,18 @@ export class SecurityManager {
   }
 
   async rotateKey(): Promise<void> {
-    // Decrypt all existing data with old key
-    // Generate new key
-    // Re-encrypt all data with new key
-    // Save new key
     const newKey = crypto.randomBytes(32);
     
-    // Backup old key
     const backupFile = this.keyFile + '.backup';
     await fs.copyFile(this.keyFile, backupFile);
     
-    // Save new key
     await fs.writeFile(this.keyFile, newKey, { mode: 0o600 });
     
     this.masterKey = newKey;
+  }
+
+  async reEncryptData(_dataMap: Map<string, string>): Promise<void> {
+    throw new Error('Key rotation with data re-encryption is not yet implemented. All encrypted data will become unreadable after key rotation. Manual intervention required.');
   }
 
   // Secure comparison to prevent timing attacks
