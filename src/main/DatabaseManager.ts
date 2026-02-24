@@ -8,6 +8,16 @@ import { Agent, AgentMessage, AgentTask, CodeChange, Automation, Project, Change
 const DB_DIR = path.join(os.homedir(), '.config', 'codex');
 const DB_PATH = path.join(DB_DIR, 'codex.db');
 
+function safeJsonParse<T>(str: string | null | undefined, defaultValue: T): T {
+  if (!str) return defaultValue;
+  try {
+    return JSON.parse(str) as T;
+  } catch (error) {
+    log.error('JSON parse error:', error);
+    return defaultValue;
+  }
+}
+
 export class DatabaseManager {
   private db: Database.Database | null = null;
 
@@ -353,7 +363,7 @@ export class DatabaseManager {
       throw new Error(`Agent ${checkpointRow.agent_id} not found for checkpoint ${checkpointId}`);
     }
 
-    const agentMetadata = agentRow.metadata ? JSON.parse(agentRow.metadata) : {};
+    const agentMetadata = safeJsonParse(agentRow.metadata, {} as Record<string, any>);
     const worktreePath: string | undefined = agentMetadata.worktreePath || undefined;
     if (!worktreePath || typeof worktreePath !== 'string') {
       throw new Error(`Worktree path not available for agent ${agentRow.id}`);
@@ -514,7 +524,7 @@ export class DatabaseManager {
       role: row.role,
       content: row.content,
       timestamp: new Date(row.timestamp),
-      metadata: row.metadata ? JSON.parse(row.metadata) : undefined
+      metadata: safeJsonParse(row.metadata, undefined as Record<string, any> | undefined)
     }));
   }
 
@@ -719,7 +729,7 @@ export class DatabaseManager {
       throw new Error(`Agent ${changeRow.agent_id} not found for code change ${changeId}`);
     }
 
-    const agentMetadata = agentRow.metadata ? JSON.parse(agentRow.metadata) : {};
+    const agentMetadata = safeJsonParse(agentRow.metadata, {} as Record<string, any>);
     const worktreePath: string | undefined = agentMetadata.worktreePath || undefined;
 
     if (!worktreePath || typeof worktreePath !== 'string') {
@@ -780,8 +790,8 @@ export class DatabaseManager {
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-      logs: JSON.parse(row.logs || '[]'),
-      deliverables: JSON.parse(row.deliverables || '[]'),
+      logs: safeJsonParse(row.logs, [] as string[]),
+      deliverables: safeJsonParse(row.deliverables, [] as string[]),
       autoApprove: Boolean(row.auto_approve)
     }));
   }
@@ -821,14 +831,14 @@ export class DatabaseManager {
       worktreeName: row.worktree_name,
       providerId: row.provider_id,
       model: row.model,
-      skills: JSON.parse(row.skills),
+      skills: safeJsonParse(row.skills, [] as string[]),
       permissionMode: row.permission_mode || 'ask',
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       lastActiveAt: row.last_active_at ? new Date(row.last_active_at) : null,
       messages: [],
       tasks: [],
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      metadata: safeJsonParse(row.metadata, {} as Record<string, any>)
     };
   }
 

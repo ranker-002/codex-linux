@@ -18,6 +18,7 @@ export class AuditLogger {
   private logDir: string;
   private currentLogFile: string;
   private writeStream: ReturnType<typeof createWriteStream> | null = null;
+  private rotateInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.logDir = path.join(app.getPath('userData'), 'audit-logs');
@@ -28,8 +29,18 @@ export class AuditLogger {
     await fs.mkdir(this.logDir, { recursive: true });
     await this.rotateLogFile();
     
-    // Rotate logs every hour
-    setInterval(() => this.rotateLogFile(), 60 * 60 * 1000);
+    this.rotateInterval = setInterval(() => this.rotateLogFile(), 60 * 60 * 1000);
+  }
+
+  async cleanup(): Promise<void> {
+    if (this.rotateInterval) {
+      clearInterval(this.rotateInterval);
+      this.rotateInterval = null;
+    }
+    if (this.writeStream) {
+      this.writeStream.end();
+      this.writeStream = null;
+    }
   }
 
   private async rotateLogFile(): Promise<void> {

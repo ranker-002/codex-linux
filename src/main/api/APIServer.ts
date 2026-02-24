@@ -4,10 +4,34 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { z } from 'zod';
 import { AgentOrchestrator } from '../agents/AgentOrchestrator';
 import { SecurityManager } from '../security/SecurityManager';
 import { AuditLogger } from '../security/AuditLogger';
 import log from 'electron-log';
+
+const CreateAgentSchema = z.object({
+  name: z.string().min(1).max(100),
+  projectPath: z.string().min(1),
+  providerId: z.string().min(1),
+  model: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  systemPrompt: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+const SendMessageSchema = z.object({
+  message: z.string().min(1).max(10000),
+});
+
+const ExecuteTaskSchema = z.object({
+  task: z.string().min(1).max(5000),
+});
+
+const WebhookPayloadSchema = z.object({
+  automationId: z.string().optional(),
+  payload: z.any().optional(),
+});
 
 export class APIServer {
   private app: express.Application;
@@ -31,10 +55,13 @@ export class APIServer {
 
     this.app = express();
     this.server = createServer(this.app);
+
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'];
     this.io = new Server(this.server, {
       cors: {
-        origin: '*',
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
+        credentials: true,
       },
     });
 
@@ -78,11 +105,15 @@ export class APIServer {
       return;
     }
 
-    // Validate API key
     try {
-      // In real implementation, verify against stored keys
+      const isValid = await this.securityManager.validateApiKey(apiKey);
+      if (!isValid) {
+        res.status(401).json({ error: 'Invalid API key' });
+        return;
+      }
       next();
     } catch (error) {
+      log.error('Authentication error:', error);
       res.status(401).json({ error: 'Invalid API key' });
     }
   }
@@ -106,7 +137,21 @@ export class APIServer {
 
     this.app.post('/api/agents', async (req: Request, res: Response) => {
       try {
-        const agent = await this.agentOrchestrator.createAgent(req.body);
+        const validated = CreateAgentSchema.safeParse(req.body);
+        if (!validated.success) {
+          res.status(400).json({ error: 'Invalid request', details: validated.error.errors });
+          return;
+        }
+        const agentConfig = {
+          name: validated.data.name,
+          projectPath: validated.data.projectPath,
+          providerId: validated.data.providerId,
+          model: validated.data.model || 'gpt-4o',
+          skills: validated.data.skills,
+          systemPrompt: validated.data.systemPrompt,
+          metadata: validated.data.metadata,
+        };
+        const agent = await this.agentOrchestrator.createAgent(agentConfig);
         await this.auditLogger.log('agent_created', { agentId: agent.id });
         res.status(201).json(agent);
       } catch (error) {
@@ -131,8 +176,12 @@ export class APIServer {
 
     this.app.post('/api/agents/:id/messages', async (req: Request, res: Response) => {
       try {
-        const { message } = req.body;
-        const response = await this.agentOrchestrator.sendMessage(req.params.id, message);
+        const validated = SendMessageSchema.safeParse(req.body);
+        if (!validated.success) {
+          res.status(400).json({ error: 'Invalid request', details: validated.error.errors });
+          return;
+        }
+        const response = await this.agentOrchestrator.sendMessage(req.params.id, validated.data.message);
         res.json(response);
       } catch (error) {
         log.error('Failed to send message:', error);
@@ -142,8 +191,12 @@ export class APIServer {
 
     this.app.post('/api/agents/:id/tasks', async (req: Request, res: Response) => {
       try {
-        const { task } = req.body;
-        const taskObj = await this.agentOrchestrator.executeTask(req.params.id, task);
+        const validated = ExecuteTaskSchema.safeParse(req.body);
+        if (!validated.success) {
+          res.status(400).json({ error: 'Invalid request', details: validated.error.errors });
+          return;
+        }
+        const taskObj = await this.agentOrchestrator.executeTask(req.params.id, validated.data.task);
         res.status(201).json(taskObj);
       } catch (error) {
         log.error('Failed to execute task:', error);

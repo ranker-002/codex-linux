@@ -25,6 +25,8 @@ interface ServerInstance {
   status: 'stopped' | 'starting' | 'running' | 'error';
   lastError?: string;
   authToken?: MCPAuthToken;
+  toolsLoaded: boolean;
+  toolsByCategory: Map<string, MCPTool[]>;
 }
 
 export class MCPManager extends EventEmitter {
@@ -33,6 +35,8 @@ export class MCPManager extends EventEmitter {
   private configManager: MCPConfigurationManager;
   private messageId = 0;
   private pendingRequests: Map<number, { resolve: Function; reject: Function; timeout: NodeJS.Timeout }> = new Map();
+  private toolSearchCache: Map<string, { tools: MCPTool[]; timestamp: number }> = new Map();
+  private toolSearchTTL = 5 * 60 * 1000;
 
   constructor() {
     super();
@@ -61,6 +65,8 @@ export class MCPManager extends EventEmitter {
         resources: [],
         prompts: [],
         status: 'stopped',
+        toolsLoaded: false,
+        toolsByCategory: new Map(),
       });
 
       // Auto-start enabled servers
@@ -86,6 +92,8 @@ export class MCPManager extends EventEmitter {
       resources: [],
       prompts: [],
       status: 'stopped',
+      toolsLoaded: false,
+      toolsByCategory: new Map(),
     });
 
     this.emit('server:added', config);
@@ -236,6 +244,10 @@ export class MCPManager extends EventEmitter {
           ...t,
           serverId,
         }));
+        
+        // Build category index for lazy loading
+        this.buildToolsCategoryIndex(server);
+        server.toolsLoaded = true;
       }
     } catch (error) {
       log.warn(`Failed to discover tools for ${serverId}:`, error);
@@ -635,6 +647,141 @@ export class MCPManager extends EventEmitter {
 
   getConfigManager(): MCPConfigurationManager {
     return this.configManager;
+  }
+
+  // Lazy Loading - Build category index for tools
+  private buildToolsCategoryIndex(server: ServerInstance): void {
+    server.toolsByCategory.clear();
+    
+    for (const tool of server.tools) {
+      const category = this.categorizeTool(tool);
+      const existing = server.toolsByCategory.get(category) || [];
+      existing.push(tool);
+      server.toolsByCategory.set(category, existing);
+    }
+  }
+
+  private categorizeTool(tool: MCPTool): string {
+    const name = tool.name.toLowerCase();
+    const inputSchema = JSON.stringify(tool.inputSchema).toLowerCase();
+    
+    if (name.includes('file') || name.includes('read') || name.includes('write') || inputSchema.includes('path')) {
+      return 'filesystem';
+    }
+    if (name.includes('git') || name.includes('branch') || name.includes('commit')) {
+      return 'git';
+    }
+    if (name.includes('search') || name.includes('find') || name.includes('query')) {
+      return 'search';
+    }
+    if (name.includes('db') || name.includes('database') || name.includes('sql')) {
+      return 'database';
+    }
+    if (name.includes('api') || name.includes('http') || name.includes('fetch')) {
+      return 'api';
+    }
+    if (name.includes('run') || name.includes('execute') || name.includes('command')) {
+      return 'execution';
+    }
+    return 'other';
+  }
+
+  // Get tools by category (lazy loaded)
+  async getToolsByCategory(serverId: string, category: string): Promise<MCPTool[]> {
+    const server = this.servers.get(serverId);
+    if (!server) return [];
+    
+    if (!server.toolsLoaded) {
+      await this.discoverCapabilities(serverId);
+    }
+    
+    return server.toolsByCategory.get(category) || [];
+  }
+
+  // Smart tool retrieval - only loads tools when needed
+  async getRelevantTools(serverId: string, context: string): Promise<MCPTool[]> {
+    const server = this.servers.get(serverId);
+    if (!server) return [];
+    
+    if (!server.toolsLoaded) {
+      await this.discoverCapabilities(serverId);
+    }
+    
+    const contextLower = context.toLowerCase();
+    const relevantTools: MCPTool[] = [];
+    
+    for (const tool of server.tools) {
+      const name = tool.name.toLowerCase();
+      const desc = (tool.description || '').toLowerCase();
+      
+      // Score tool relevance
+      let score = 0;
+      if (name.includes(contextLower) || desc.includes(contextLower)) {
+        score = 3;
+      } else if (this.categorizeTool(tool) === this.inferCategoryFromContext(contextLower)) {
+        score = 2;
+      }
+      
+      if (score > 0) {
+        relevantTools.push(tool);
+      }
+    }
+    
+    // If no specific tools found, return all (for broader context)
+    return relevantTools.length > 0 ? relevantTools : server.tools.slice(0, 10);
+  }
+
+  private inferCategoryFromContext(context: string): string {
+    if (context.includes('file') || context.includes('folder') || context.includes('directory')) {
+      return 'filesystem';
+    }
+    if (context.includes('git') || context.includes('commit') || context.includes('branch')) {
+      return 'git';
+    }
+    if (context.includes('search') || context.includes('find')) {
+      return 'search';
+    }
+    if (context.includes('database') || context.includes('query') || context.includes('sql')) {
+      return 'database';
+    }
+    return 'other';
+  }
+
+  // Cached search with TTL
+  async searchToolsCached(query: string): Promise<MCPSearchResult> {
+    const cached = this.toolSearchCache.get(query);
+    if (cached && Date.now() - cached.timestamp < this.toolSearchTTL) {
+      return {
+        query,
+        tools: cached.tools,
+        resources: [],
+        prompts: [],
+      };
+    }
+
+    const result = await this.searchTools(query);
+    this.toolSearchCache.set(query, {
+      tools: result.tools,
+      timestamp: Date.now(),
+    });
+
+    return result;
+  }
+
+  // Clear tool cache
+  clearToolCache(): void {
+    this.toolSearchCache.clear();
+  }
+
+  // Get tools count for UI
+  getToolsCount(): number {
+    let count = 0;
+    for (const server of this.servers.values()) {
+      if (server.status === 'running') {
+        count += server.tools.length;
+      }
+    }
+    return count;
   }
 
   private getNextMessageId(): number {
