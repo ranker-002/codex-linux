@@ -3,12 +3,38 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import { z } from 'zod';
 import { AgentOrchestrator } from '../agents/AgentOrchestrator';
 import { SecurityManager } from '../security/SecurityManager';
 import { AuditLogger } from '../security/AuditLogger';
 import log from 'electron-log';
+
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const wsRateLimits = new Map<string, RateLimitEntry>();
+const WS_RATE_LIMIT = 30;
+const WS_RATE_WINDOW_MS = 60000;
+
+function checkWebSocketRateLimit(socketId: string): boolean {
+  const now = Date.now();
+  const entry = wsRateLimits.get(socketId);
+  
+  if (!entry || now > entry.resetTime) {
+    wsRateLimits.set(socketId, { count: 1, resetTime: now + WS_RATE_WINDOW_MS });
+    return true;
+  }
+  
+  if (entry.count >= WS_RATE_LIMIT) {
+    return false;
+  }
+  
+  entry.count++;
+  return true;
+}
 
 const CreateAgentSchema = z.object({
   name: z.string().min(1).max(100),
@@ -26,11 +52,6 @@ const SendMessageSchema = z.object({
 
 const ExecuteTaskSchema = z.object({
   task: z.string().min(1).max(5000),
-});
-
-const WebhookPayloadSchema = z.object({
-  automationId: z.string().optional(),
-  payload: z.any().optional(),
 });
 
 export class APIServer {
@@ -229,23 +250,25 @@ export class APIServer {
     });
 
     // Error handling
-    this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    this.app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
       log.error('API Error:', err);
       res.status(500).json({ error: 'Internal server error' });
     });
   }
 
   private setupWebSocket(): void {
-    this.io.on('connection', (socket) => {
+    this.io.on('connection', (socket: Socket) => {
       log.info('Client connected:', socket.id);
 
-      // Subscribe to agent events
       socket.on('subscribe_agent', (agentId: string) => {
         socket.join(`agent:${agentId}`);
       });
 
-      // Send message to agent
       socket.on('send_message', async (data: { agentId: string; message: string }) => {
+        if (!checkWebSocketRateLimit(socket.id)) {
+          socket.emit('error', { message: 'Rate limit exceeded' });
+          return;
+        }
         try {
           const response = await this.agentOrchestrator.sendMessage(
             data.agentId,
@@ -258,6 +281,7 @@ export class APIServer {
       });
 
       socket.on('disconnect', () => {
+        wsRateLimits.delete(socket.id);
         log.info('Client disconnected:', socket.id);
       });
     });

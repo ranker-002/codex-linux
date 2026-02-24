@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import log from 'electron-log';
 
 const API_KEYS = new Set<string>();
 
@@ -23,16 +24,27 @@ export class SecurityManager {
       await fs.mkdir(path.dirname(this.keyFile), { recursive: true });
       await fs.writeFile(this.keyFile, this.masterKey, { mode: 0o600 });
     }
-    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.json');
+    await this.loadApiKeys();
+  }
+
+  private async loadApiKeys(): Promise<void> {
+    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.enc');
     try {
-      const data = await fs.readFile(apiKeysPath, 'utf-8');
-      const keys = JSON.parse(data) as string[];
+      const encryptedData = await fs.readFile(apiKeysPath, 'utf-8');
+      const keys = JSON.parse(this.decrypt(encryptedData)) as string[];
       keys.forEach((k) => API_KEYS.add(k));
     } catch {
       const defaultKey = crypto.randomBytes(32).toString('hex');
       API_KEYS.add(defaultKey);
-      await fs.writeFile(apiKeysPath, JSON.stringify([defaultKey]), { mode: 0o600 });
+      await this.saveApiKeys();
+      log.info('Generated new default API key');
     }
+  }
+
+  private async saveApiKeys(): Promise<void> {
+    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.enc');
+    const encrypted = this.encrypt(JSON.stringify([...API_KEYS]));
+    await fs.writeFile(apiKeysPath, encrypted, { mode: 0o600 });
   }
 
   async validateApiKey(apiKey: string): Promise<boolean> {
@@ -41,14 +53,12 @@ export class SecurityManager {
 
   async addApiKey(apiKey: string): Promise<void> {
     API_KEYS.add(apiKey);
-    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.json');
-    await fs.writeFile(apiKeysPath, JSON.stringify([...API_KEYS]), { mode: 0o600 });
+    await this.saveApiKeys();
   }
 
   async removeApiKey(apiKey: string): Promise<void> {
     API_KEYS.delete(apiKey);
-    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.json');
-    await fs.writeFile(apiKeysPath, JSON.stringify([...API_KEYS]), { mode: 0o600 });
+    await this.saveApiKeys();
   }
 
   encrypt(text: string): string {
@@ -108,6 +118,7 @@ export class SecurityManager {
     await fs.writeFile(this.keyFile, newKey, { mode: 0o600 });
     
     this.masterKey = newKey;
+    await this.saveApiKeys();
   }
 
   async reEncryptData(_dataMap: Map<string, string>): Promise<void> {

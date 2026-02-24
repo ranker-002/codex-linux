@@ -46,6 +46,7 @@ export class DatabaseManager {
 
   async close(): Promise<void> {
     if (this.db) {
+      this.db.pragma('wal_checkpoint(TRUNCATE)');
       this.db.close();
       this.db = null;
       log.info('Database connection closed');
