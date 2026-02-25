@@ -98,6 +98,31 @@ const DEFAULT_COMMANDS: SlashCommand[] = [
     },
   },
   {
+    id: 'compact',
+    name: 'compact',
+    description: 'Compact context to free up space',
+    usage: '/compact [--aggressive]',
+    aliases: ['compress', 'summarize'],
+    execute: async (args: string) => {
+      const isAggressive = args.includes('--aggressive') || args.includes('-a');
+      return { 
+        success: true, 
+        message: `Compacting context...${isAggressive ? ' (aggressive mode)' : ''}`,
+        data: { isAggressive }
+      };
+    },
+  },
+  {
+    id: 'resume',
+    name: 'resume',
+    description: 'Resume a session',
+    usage: '/resume <session-id>',
+    aliases: ['continue', 'res'],
+    execute: async (args: string) => {
+      return { success: true, message: `Resuming session: ${args}` };
+    },
+  },
+  {
     id: 'skills',
     name: 'skills',
     description: 'Manage skills',

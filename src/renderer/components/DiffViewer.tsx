@@ -414,7 +414,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-background/50">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onReject(currentChange.id, '')}
+            onClick={() => onReject(currentChange.id)}
             className="flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
           >
             <X className="w-4 h-4" />

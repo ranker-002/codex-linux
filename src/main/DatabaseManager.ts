@@ -3,10 +3,20 @@ import * as os from 'os';
 import * as fs from 'fs';
 import Database from 'better-sqlite3';
 import log from 'electron-log';
-import { Agent, AgentMessage, AgentTask, CodeChange, Automation, Project, ChangeStatus } from '../shared/types';
+import { Agent, AgentMessage, AgentTask, CodeChange, Automation, Project, ChangeStatus, Checkpoint } from '../shared/types';
 
 const DB_DIR = path.join(os.homedir(), '.config', 'codex');
 const DB_PATH = path.join(DB_DIR, 'codex.db');
+
+function safeJsonParse<T>(str: string | null | undefined, defaultValue: T): T {
+  if (!str) return defaultValue;
+  try {
+    return JSON.parse(str) as T;
+  } catch (error) {
+    log.error('JSON parse error:', error);
+    return defaultValue;
+  }
+}
 
 export class DatabaseManager {
   private db: Database.Database | null = null;
@@ -24,6 +34,9 @@ export class DatabaseManager {
       // Create tables
       this.createTables();
       
+      // Reset any "running" queue items from previous sessions
+      this.db.prepare("UPDATE agent_queue_items SET status = 'pending' WHERE status = 'running'").run();
+      
       log.info(`Database initialized at ${DB_PATH}`);
     } catch (error) {
       log.error('Failed to initialize database:', error);
@@ -33,6 +46,7 @@ export class DatabaseManager {
 
   async close(): Promise<void> {
     if (this.db) {
+      this.db.pragma('wal_checkpoint(TRUNCATE)');
       this.db.close();
       this.db = null;
       log.info('Database connection closed');
@@ -58,6 +72,23 @@ export class DatabaseManager {
         updated_at INTEGER NOT NULL,
         last_active_at INTEGER,
         metadata TEXT
+      )
+    `);
+
+    // Agent queue items table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_queue_items (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        status TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        started_at INTEGER,
+        completed_at INTEGER,
+        error TEXT,
+        FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
       )
     `);
 
@@ -156,13 +187,219 @@ export class DatabaseManager {
       )
     `);
 
+    // Checkpoints table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS checkpoints (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL,
+        change_id TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        restored_at INTEGER
+      )
+    `);
+
     // Create indexes
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_messages_agent ON agent_messages(agent_id);
       CREATE INDEX IF NOT EXISTS idx_tasks_agent ON agent_tasks(agent_id);
       CREATE INDEX IF NOT EXISTS idx_changes_agent ON code_changes(agent_id);
-      CREATE INDEX IF NOT EXISTS idx_changes_status ON code_changes(status);
+      CREATE INDEX IF NOT EXISTS idx_automations_enabled ON automations(enabled);
+      CREATE INDEX IF NOT EXISTS idx_checkpoints_agent ON checkpoints(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_queue_agent ON agent_queue_items(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_queue_agent_pos ON agent_queue_items(agent_id, position);
     `);
+  }
+
+  // Agent queue
+  async listAgentQueueItems(agentId: string): Promise<Array<{ id: string; agentId: string; type: 'message' | 'task'; content: string; status: 'pending' | 'running'; position: number; createdAt: Date }>> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const rows = this.db.prepare(
+      "SELECT * FROM agent_queue_items WHERE agent_id = ? AND status IN ('pending','running') ORDER BY position ASC"
+    ).all(agentId) as any[];
+
+    return rows.map(r => ({
+      id: r.id,
+      agentId: r.agent_id,
+      type: r.type,
+      content: r.content,
+      status: r.status,
+      position: r.position,
+      createdAt: new Date(r.created_at)
+    }));
+  }
+
+  async enqueueAgentQueueItem(agentId: string, type: 'message' | 'task', content: string): Promise<{ id: string }> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const trimmed = content.trim();
+    if (!trimmed) throw new Error('Queue item content cannot be empty');
+
+    const maxPosRow = this.db.prepare('SELECT MAX(position) as maxPos FROM agent_queue_items WHERE agent_id = ?').get(agentId) as any;
+    const nextPos = (maxPosRow?.maxPos ?? -1) + 1;
+    const id = `q_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+    this.db.prepare(
+      'INSERT INTO agent_queue_items (id, agent_id, type, content, status, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, agentId, type, trimmed, 'pending', nextPos, Date.now());
+
+    return { id };
+  }
+
+  async deleteAgentQueueItem(agentId: string, itemId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const tx = this.db.transaction(() => {
+      this.db!.prepare('DELETE FROM agent_queue_items WHERE id = ? AND agent_id = ?').run(itemId, agentId);
+
+      const rows = this.db!.prepare('SELECT id FROM agent_queue_items WHERE agent_id = ? ORDER BY position ASC').all(agentId) as any[];
+      const update = this.db!.prepare('UPDATE agent_queue_items SET position = ? WHERE id = ?');
+      rows.forEach((r, idx) => update.run(idx, r.id));
+    });
+
+    tx();
+  }
+
+  async moveAgentQueueItemUp(agentId: string, itemId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const row = this.db.prepare('SELECT id, position FROM agent_queue_items WHERE id = ? AND agent_id = ?').get(itemId, agentId) as any;
+    if (!row) return;
+    if (row.position <= 0) return;
+
+    const prev = this.db.prepare('SELECT id, position FROM agent_queue_items WHERE agent_id = ? AND position = ?').get(agentId, row.position - 1) as any;
+    if (!prev) return;
+
+    const tx = this.db.transaction(() => {
+      this.db!.prepare('UPDATE agent_queue_items SET position = ? WHERE id = ?').run(row.position - 1, row.id);
+      this.db!.prepare('UPDATE agent_queue_items SET position = ? WHERE id = ?').run(prev.position + 1, prev.id);
+    });
+    tx();
+  }
+
+  async claimNextAgentQueueItem(agentId: string): Promise<{ id: string; type: 'message' | 'task'; content: string } | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const tx = this.db.transaction(() => {
+      const next = this.db!.prepare(
+        "SELECT * FROM agent_queue_items WHERE agent_id = ? AND status = 'pending' ORDER BY position ASC LIMIT 1"
+      ).get(agentId) as any;
+      if (!next) return null;
+
+      this.db!.prepare(
+        "UPDATE agent_queue_items SET status = 'running', started_at = ? WHERE id = ?"
+      ).run(Date.now(), next.id);
+
+      return { id: next.id, type: next.type, content: next.content } as { id: string; type: 'message' | 'task'; content: string };
+    });
+
+    return tx();
+  }
+
+  async completeAgentQueueItem(agentId: string, itemId: string, outcome: 'completed' | 'failed', error?: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Mark as completed/failed with outcome and error
+    this.db.prepare(
+      "UPDATE agent_queue_items SET status = ?, completed_at = ?, error = ? WHERE id = ? AND agent_id = ?"
+    ).run(outcome, Date.now(), error || null, itemId, agentId);
+  }
+
+  async getQueueHistory(agentId: string, limit: number = 50): Promise<Array<{ id: string; type: 'message' | 'task'; content: string; status: string; createdAt: Date; completedAt?: Date; error?: string }>> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const rows = this.db.prepare(
+      "SELECT * FROM agent_queue_items WHERE agent_id = ? AND status IN ('completed','failed') ORDER BY completed_at DESC LIMIT ?"
+    ).all(agentId, limit) as any[];
+
+    return rows.map(r => ({
+      id: r.id,
+      type: r.type,
+      content: r.content,
+      status: r.status,
+      createdAt: new Date(r.created_at),
+      completedAt: r.completed_at ? new Date(r.completed_at) : undefined,
+      error: r.error || undefined
+    }));
+  }
+
+  // Checkpoints
+  async listCheckpoints(agentId?: string): Promise<Checkpoint[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    let query = 'SELECT * FROM checkpoints';
+    const params: any[] = [];
+
+    if (agentId) {
+      query += ' WHERE agent_id = ?';
+      params.push(agentId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    const rows = this.db.prepare(query).all(...params) as any[];
+    return rows.map(row => ({
+      id: row.id,
+      agentId: row.agent_id,
+      changeId: row.change_id,
+      filePath: row.file_path,
+      content: row.content,
+      createdAt: new Date(row.created_at),
+      restoredAt: row.restored_at ? new Date(row.restored_at) : undefined
+    }));
+  }
+
+  async restoreCheckpoint(checkpointId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const checkpointRow = this.db.prepare('SELECT * FROM checkpoints WHERE id = ?').get(checkpointId) as any;
+    if (!checkpointRow) {
+      throw new Error(`Checkpoint ${checkpointId} not found`);
+    }
+
+    const agentRow = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(checkpointRow.agent_id) as any;
+    if (!agentRow) {
+      throw new Error(`Agent ${checkpointRow.agent_id} not found for checkpoint ${checkpointId}`);
+    }
+
+    const agentMetadata = safeJsonParse(agentRow.metadata, {} as Record<string, any>);
+    const worktreePath: string | undefined = agentMetadata.worktreePath || undefined;
+    if (!worktreePath || typeof worktreePath !== 'string') {
+      throw new Error(`Worktree path not available for agent ${agentRow.id}`);
+    }
+
+    const relativeFilePath = String(checkpointRow.file_path || '').trim();
+    if (!relativeFilePath) {
+      throw new Error(`Invalid file path for checkpoint ${checkpointId}`);
+    }
+
+    const targetPath = path.resolve(worktreePath, relativeFilePath);
+    const resolvedRoot = path.resolve(worktreePath);
+    if (!targetPath.startsWith(resolvedRoot + path.sep) && targetPath !== resolvedRoot) {
+      throw new Error('Refusing to write outside of worktree root');
+    }
+
+    await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.promises.writeFile(targetPath, checkpointRow.content || '', 'utf-8');
+
+    this.db.prepare('UPDATE checkpoints SET restored_at = ? WHERE id = ?').run(Date.now(), checkpointId);
+    log.info(`Restored checkpoint ${checkpointId} to ${relativeFilePath}`);
+  }
+
+  async restoreLastCheckpoint(agentId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const row = this.db.prepare(
+      'SELECT * FROM checkpoints WHERE agent_id = ? AND restored_at IS NULL ORDER BY created_at DESC LIMIT 1'
+    ).get(agentId) as any;
+
+    if (!row) {
+      throw new Error('No checkpoint available');
+    }
+
+    await this.restoreCheckpoint(row.id);
   }
 
   // Agent operations
@@ -288,7 +525,7 @@ export class DatabaseManager {
       role: row.role,
       content: row.content,
       timestamp: new Date(row.timestamp),
-      metadata: row.metadata ? JSON.parse(row.metadata) : undefined
+      metadata: safeJsonParse(row.metadata, undefined as Record<string, any> | undefined)
     }));
   }
 
@@ -479,13 +716,62 @@ export class DatabaseManager {
   async applyCodeChange(changeId: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const stmt = this.db.prepare(`
-      UPDATE code_changes SET
-        status = ?
-      WHERE id = ?
-    `);
+    const changeRow = this.db.prepare('SELECT * FROM code_changes WHERE id = ?').get(changeId) as any;
+    if (!changeRow) {
+      throw new Error(`Code change ${changeId} not found`);
+    }
 
-    stmt.run(ChangeStatus.APPLIED, changeId);
+    if (changeRow.status !== ChangeStatus.APPROVED) {
+      throw new Error(`Code change ${changeId} must be approved before applying`);
+    }
+
+    const agentRow = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(changeRow.agent_id) as any;
+    if (!agentRow) {
+      throw new Error(`Agent ${changeRow.agent_id} not found for code change ${changeId}`);
+    }
+
+    const agentMetadata = safeJsonParse(agentRow.metadata, {} as Record<string, any>);
+    const worktreePath: string | undefined = agentMetadata.worktreePath || undefined;
+
+    if (!worktreePath || typeof worktreePath !== 'string') {
+      throw new Error(`Worktree path not available for agent ${agentRow.id}`);
+    }
+
+    const relativeFilePath = String(changeRow.file_path || '').trim();
+    if (!relativeFilePath) {
+      throw new Error(`Invalid file path for code change ${changeId}`);
+    }
+
+    const targetPath = path.resolve(worktreePath, relativeFilePath);
+    const resolvedRoot = path.resolve(worktreePath);
+    if (!targetPath.startsWith(resolvedRoot + path.sep) && targetPath !== resolvedRoot) {
+      throw new Error('Refusing to write outside of worktree root');
+    }
+
+    let currentContent = '';
+    try {
+      currentContent = await fs.promises.readFile(targetPath, 'utf-8');
+    } catch {
+      currentContent = '';
+    }
+
+    const checkpointId = `cp_${changeId}_${Date.now()}`;
+    this.db.prepare(
+      'INSERT INTO checkpoints (id, agent_id, change_id, file_path, content, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(
+      checkpointId,
+      changeRow.agent_id,
+      changeId,
+      relativeFilePath,
+      currentContent,
+      Date.now()
+    );
+
+    await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.promises.writeFile(targetPath, changeRow.new_content || '', 'utf-8');
+
+    this.db.prepare('UPDATE code_changes SET status = ? WHERE id = ?').run(ChangeStatus.APPLIED, changeId);
+    log.info(`Applied code change ${changeId} to ${relativeFilePath}`);
   }
 
   // Cowork sessions
@@ -505,8 +791,8 @@ export class DatabaseManager {
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
-      logs: JSON.parse(row.logs || '[]'),
-      deliverables: JSON.parse(row.deliverables || '[]'),
+      logs: safeJsonParse(row.logs, [] as string[]),
+      deliverables: safeJsonParse(row.deliverables, [] as string[]),
       autoApprove: Boolean(row.auto_approve)
     }));
   }
@@ -546,14 +832,14 @@ export class DatabaseManager {
       worktreeName: row.worktree_name,
       providerId: row.provider_id,
       model: row.model,
-      skills: JSON.parse(row.skills),
+      skills: safeJsonParse(row.skills, [] as string[]),
       permissionMode: row.permission_mode || 'ask',
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       lastActiveAt: row.last_active_at ? new Date(row.last_active_at) : null,
       messages: [],
       tasks: [],
-      metadata: row.metadata ? JSON.parse(row.metadata) : {}
+      metadata: safeJsonParse(row.metadata, {} as Record<string, any>)
     };
   }
 

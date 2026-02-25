@@ -129,6 +129,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
     apply: (changeId: string) => ipcRenderer.invoke('changes:apply', changeId),
   },
 
+  // Checkpoints operations
+  checkpoints: {
+    list: (agentId?: string) => ipcRenderer.invoke('checkpoints:list', agentId),
+    restore: (checkpointId: string) => ipcRenderer.invoke('checkpoints:restore', checkpointId),
+    restoreLast: (agentId: string) => ipcRenderer.invoke('checkpoints:restoreLast', agentId),
+  },
+
+  // Agent queue operations
+  queue: {
+    list: (agentId: string) => ipcRenderer.invoke('queue:list', agentId),
+    enqueue: (agentId: string, type: 'message' | 'task', content: string) => ipcRenderer.invoke('queue:enqueue', agentId, type, content),
+    delete: (agentId: string, itemId: string) => ipcRenderer.invoke('queue:delete', agentId, itemId),
+    moveUp: (agentId: string, itemId: string) => ipcRenderer.invoke('queue:moveUp', agentId, itemId),
+    claimNext: (agentId: string) => ipcRenderer.invoke('queue:claimNext', agentId),
+    complete: (agentId: string, itemId: string, outcome: 'completed' | 'failed', error?: string) => ipcRenderer.invoke('queue:complete', agentId, itemId, outcome, error),
+    history: (agentId: string, limit?: number) => ipcRenderer.invoke('queue:history', agentId, limit),
+  },
+
+  // Audit log operations
+  audit: {
+    recent: (limit?: number) => ipcRenderer.invoke('audit:recent', limit),
+    byAction: (action: string, limit?: number) => ipcRenderer.invoke('audit:byAction', action, limit),
+    export: (exportPath: string) => ipcRenderer.invoke('audit:export', exportPath),
+  },
+
   // Git operations
   git: {
     status: (repoPath: string) => ipcRenderer.invoke('git:status', repoPath),
@@ -162,6 +187,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'agent:streamChunk',
       'agent:streamEnd',
       'agent:streamError',
+      'agent:taskStarted',
+      'agent:taskCompleted',
+      'agent:taskFailed',
+      'agent:paused',
+      'agent:resumed',
+      'agent:stopped',
+      'changes:created',
       'automation:triggered',
       'worktree:changed',
       'skill:applied',

@@ -1,103 +1,275 @@
 #!/bin/bash
-
-# Codex Linux Installation Script
-# Supports: Ubuntu/Debian, Fedora/RHEL/CentOS, Arch Linux
-
 set -e
 
-echo "🚀 Installing Codex Linux..."
+# Codex Linux Universal Installer
+# Works on ALL Linux distributions via AppImage
+# Usage: curl -fsSL https://codex-linux.dev/install.sh | bash
 
-# Detect distribution
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS=$ID
-    VER=$VERSION_ID
-else
-    echo "❌ Cannot detect Linux distribution"
-    exit 1
-fi
+REPO="ranker-002/codex-linux"
+APP_NAME="Codex Linux"
+BINARY_NAME="codex-linux"
+DESKTOP_ENTRY="codex-linux.desktop"
 
-# Install dependencies based on distribution
-case $OS in
-    ubuntu|debian)
-        echo "📦 Installing dependencies for Debian/Ubuntu..."
-        sudo apt-get update
-        sudo apt-get install -y git nodejs npm libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0
-        ;;
-    fedora|rhel|centos)
-        echo "📦 Installing dependencies for Fedora/RHEL..."
-        sudo dnf install -y git nodejs npm gtk3 libnotify nss libXScrnSaver libXtst xdg-utils at-spi2-core libuuid libsecret
-        ;;
-    arch|manjaro)
-        echo "📦 Installing dependencies for Arch Linux..."
-        sudo pacman -S --noconfirm git nodejs npm gtk3 libnotify nss libxss libxtst xdg-utils at-spi2-core util-linux-libs libsecret
-        ;;
-    *)
-        echo "⚠️  Unsupported distribution: $OS"
-        echo "Please install manually: git, nodejs, npm, and Electron dependencies"
-        ;;
-esac
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Check Node.js version
-NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
-    echo "❌ Node.js 18+ is required. Current version: $(node --version)"
-    exit 1
-fi
+print_banner() {
+    echo -e "${BLUE}"
+    echo "=========================================="
+    echo "        Codex Linux Installer"
+    echo "=========================================="
+    echo -e "${NC}"
+    echo -e "${GREEN}Universal Installer (AppImage)${NC}"
+    echo ""
+}
 
-# Create installation directory
-INSTALL_DIR="$HOME/.local/share/codex-linux"
-mkdir -p "$INSTALL_DIR"
+info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Copy application files
-echo "📂 Installing application files..."
-cp -r dist "$INSTALL_DIR/"
-cp -r assets "$INSTALL_DIR/"
-cp package.json "$INSTALL_DIR/"
+detect_arch() {
+    local arch=$(uname -m)
+    case $arch in
+        x86_64) echo "x64" ;;
+        aarch64|arm64) echo "arm64" ;;
+        *) error "Unsupported architecture: $arch"; exit 1 ;;
+    esac
+}
 
-# Create desktop entry
-echo "🖥️  Creating desktop entry..."
-mkdir -p "$HOME/.local/share/applications"
-cat > "$HOME/.local/share/applications/codex-linux.desktop" << EOF
+get_latest_version() {
+    local api_url="https://api.github.com/repos/${REPO}/releases/latest"
+    local version=$(curl -fsSL "$api_url" 2>/dev/null | grep -o '"tag_name": "[^"]*"' | cut -d'"' -f4)
+    if [ -z "$version" ]; then
+        error "Failed to get latest version. Using fallback v1.0.0"
+        echo "v1.0.0"
+    else
+        echo "$version"
+    fi
+}
+
+download_appimage() {
+    local version=$1
+    local arch=$2
+    local url="https://github.com/${REPO}/releases/download/${version}/Codex.Linux-${version#v}.AppImage"
+    local output="$BINARY_NAME.AppImage"
+
+    info "Downloading ${APP_NAME} ${version} (${arch})..."
+
+    if command -v curl &> /dev/null; then
+        curl -fsSL -o "$output" "$url" -# || {
+            error "Download failed. Trying wget..."
+            return 1
+        }
+    elif command -v wget &> /dev/null; then
+        wget -q --show-progress -O "$output" "$url" || {
+            error "Download failed"
+            return 1
+        }
+    else
+        error "curl or wget is required"
+        exit 1
+    fi
+
+    if [ ! -f "$output" ]; then
+        error "Download failed - file not found"
+        return 1
+    fi
+
+    chmod +x "$output"
+    success "Downloaded $output"
+}
+
+create_desktop_entry() {
+    local install_dir=$1
+    cat > "$DESKTOP_ENTRY" << EOF
 [Desktop Entry]
 Name=Codex Linux
 Comment=Multi-agent AI coding command center
-Exec=$INSTALL_DIR/dist/main/main.js
-Icon=$INSTALL_DIR/assets/icon.png
+Exec=$install_dir/$BINARY_NAME.AppImage
+Icon=$install_dir/$BINARY_NAME.png
 Type=Application
 Categories=Development;IDE;
 Terminal=false
 StartupNotify=true
+MimeType=text/plain;text/x-python;text/javascript;
 EOF
+}
 
-# Update desktop database
+install_user() {
+    local install_dir="$HOME/.local/bin"
+    local apps_dir="$HOME/.local/share/applications"
+    local icons_dir="$HOME/.local/share/icons/hicolor/512x512/apps"
+
+    info "Installing to user directory (~/.local)..."
+
+    mkdir -p "$install_dir" "$apps_dir" "$icons_dir"
+
+    mv "$BINARY_NAME.AppImage" "$install_dir/"
+    ln -sf "$install_dir/$BINARY_NAME.AppImage" "$install_dir/$BINARY_NAME"
+
+    create_desktop_entry "$install_dir"
+    mv "$DESKTOP_ENTRY" "$apps_dir/"
+
+    # Try to extract icon
+    if "$install_dir/$BINARY_NAME.AppImage" --appimage-extract .DirIcon &> /dev/null; then
+        mv squashfs-root/.DirIcon "$icons_dir/$BINARY_NAME.png" 2>/dev/null || true
+        rm -rf squashfs-root 2>/dev/null || true
+    fi
+
+    if command -v update-desktop-database &> /dev/null; then
+        update-desktop-database "$apps_dir" 2>/dev/null || true
+    fi
+
+    # Add to PATH if needed
+    if [[ ":$PATH:" != *":$install_dir:"* ]]; then
+        if [ -f "$HOME/.bashrc" ]; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+        fi
+        if [ -f "$HOME/.zshrc" ]; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
+        fi
+        warn "Added ~/.local/bin to PATH. Run: source ~/.bashrc (or restart terminal)"
+    fi
+
+    # Create uninstall script
+    cat > "$install_dir/uninstall-codex-linux.sh" << 'UNINSTALLEOF'
+#!/bin/bash
+echo "Uninstalling Codex Linux..."
+rm -f "$HOME/.local/bin/codex-linux"
+rm -f "$HOME/.local/bin/codex-linux.AppImage"
+rm -f "$HOME/.local/share/applications/codex-linux.desktop"
+rm -f "$HOME/.local/share/icons/hicolor/512x512/apps/codex-linux.png"
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+echo "Uninstalled successfully!"
+UNINSTALLEOF
+    chmod +x "$install_dir/uninstall-codex-linux.sh"
 
-# Create symlink in PATH
-mkdir -p "$HOME/.local/bin"
-ln -sf "$INSTALL_DIR/dist/main/main.js" "$HOME/.local/bin/codex-linux"
+    success "Installed to $install_dir"
+}
 
-# Install npm dependencies
-echo "📥 Installing npm dependencies..."
-cd "$INSTALL_DIR"
-npm install --production
+install_system() {
+    local install_dir="/opt/$BINARY_NAME"
+    local apps_dir="/usr/share/applications"
+    local icons_dir="/usr/share/icons/hicolor/512x512/apps"
 
-# Create config directory
-mkdir -p "$HOME/.config/codex"
+    info "Installing system-wide to /opt..."
 
-# Set permissions
-chmod +x "$INSTALL_DIR/dist/main/main.js"
+    if [ "$EUID" -ne 0 ]; then
+        error "System-wide install requires sudo. Run with sudo or use --user flag"
+        exit 1
+    fi
 
-echo ""
-echo "✅ Codex Linux has been installed successfully!"
-echo ""
-echo "🎯 Quick Start:"
-echo "   1. Launch Codex Linux from your applications menu"
-echo "   2. Configure your API keys in Settings → AI Providers"
-echo "   3. Create your first agent and start coding!"
-echo ""
-echo "📖 Documentation: https://codex-linux.readthedocs.io"
-echo "🐛 Report issues: https://github.com/yourusername/codex-linux/issues"
-echo ""
-echo "💡 Tip: Run 'codex-linux' from terminal to see logs"
-echo ""
+    mkdir -p "$install_dir" "$apps_dir" "$icons_dir"
+
+    mv "$BINARY_NAME.AppImage" "$install_dir/"
+    ln -sf "$install_dir/$BINARY_NAME.AppImage" "/usr/local/bin/$BINARY_NAME"
+
+    create_desktop_entry "$install_dir"
+    mv "$DESKTOP_ENTRY" "$apps_dir/"
+
+    if "$install_dir/$BINARY_NAME.AppImage" --appimage-extract .DirIcon &> /dev/null; then
+        mv squashfs-root/.DirIcon "$icons_dir/$BINARY_NAME.png" 2>/dev/null || true
+        rm -rf squashfs-root 2>/dev/null || true
+    fi
+
+    if command -v update-desktop-database &> /dev/null; then
+        update-desktop-database "$apps_dir" 2>/dev/null || true
+    fi
+
+    success "Installed to $install_dir"
+}
+
+uninstall() {
+    info "Uninstalling ${APP_NAME}..."
+
+    rm -f "$HOME/.local/bin/$BINARY_NAME"
+    rm -f "$HOME/.local/bin/$BINARY_NAME.AppImage"
+    rm -f "$HOME/.local/share/applications/$DESKTOP_ENTRY"
+    rm -f "$HOME/.local/share/icons/hicolor/512x512/apps/$BINARY_NAME.png"
+    rm -f "$HOME/.local/bin/uninstall-$BINARY_NAME.sh"
+
+    if [ "$EUID" -eq 0 ]; then
+        rm -f "/usr/local/bin/$BINARY_NAME"
+        rm -rf "/opt/$BINARY_NAME" 2>/dev/null || true
+        rm -f "/usr/share/applications/$DESKTOP_ENTRY"
+        rm -f "/usr/share/icons/hicolor/512x512/apps/$BINARY_NAME.png"
+    fi
+
+    if command -v update-desktop-database &> /dev/null; then
+        update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+    fi
+
+    success "Uninstalled successfully"
+}
+
+main() {
+    print_banner
+
+    local install_mode="user"
+    local version=""
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --user) install_mode="user"; shift ;;
+            --system) install_mode="system"; shift ;;
+            --uninstall) uninstall; exit 0 ;;
+            --version) version="$2"; shift 2 ;;
+            --help|-h)
+                echo "Usage: $0 [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  --user         Install to ~/.local/bin (default)"
+                echo "  --system       Install to /opt (requires sudo)"
+                echo "  --uninstall    Remove Codex Linux"
+                echo "  --version TAG  Install specific version"
+                echo "  --help         Show this help"
+                echo ""
+                echo "Examples:"
+                echo "  curl -fsSL https://codex-linux.dev/install.sh | bash"
+                echo "  curl -fsSL https://codex-linux.dev/install.sh | sudo bash -s -- --system"
+                exit 0
+                ;;
+            *) error "Unknown option: $1"; exit 1 ;;
+        esac
+    done
+
+    if ! command -v curl &> /dev/null && ! command -v wget &> /dev/null; then
+        error "curl or wget is required"
+        exit 1
+    fi
+
+    if [ -z "$version" ]; then
+        info "Fetching latest version..."
+        version=$(get_latest_version)
+    fi
+
+    info "Installing ${APP_NAME} ${version}..."
+
+    local arch=$(detect_arch)
+    info "Detected architecture: $arch"
+
+    download_appimage "$version" "$arch" || {
+        error "Failed to download. Please check your internet connection."
+        exit 1
+    }
+
+    if [ "$install_mode" = "system" ]; then
+        install_system
+    else
+        install_user
+    fi
+
+    echo ""
+    success "${APP_NAME} installed successfully!"
+    echo ""
+    echo -e "Run with: ${GREEN}codex-linux${NC}"
+    echo -e "Or find it in your application menu"
+    echo ""
+}
+
+main "$@"

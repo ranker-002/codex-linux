@@ -312,6 +312,102 @@ Access settings via:
 
 ---
 
+## Frequently Asked Questions (FAQ)
+
+### General
+
+**Q: What is Codex Linux?**
+A: Codex Linux is a powerful AI-powered coding assistant that runs locally on your Linux machine. It leverages OpenAI's Codex and Claude models to help you write, debug, and refactor code.
+
+**Q: How is Codex Linux different from Claude Code?**
+A: Codex Linux is designed specifically for Linux with native integrations (Git worktrees, terminal, file system), while providing similar AI agent capabilities with additional enterprise features.
+
+**Q: Is Codex Linux free to use?**
+A: The application itself is open source. However, you'll need to provide your own API keys for AI providers (OpenAI, Anthropic, etc.).
+
+### Installation
+
+**Q: What are the system requirements?**
+A: 
+- Linux distribution (Ubuntu 20.04+ recommended)
+- Node.js 18+ 
+- Git
+- 4GB RAM minimum (8GB recommended)
+- 500MB disk space
+
+**Q: Installation fails with permission errors**
+A: Try running with sudo or fix npm permissions:
+```bash
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+export PATH=~/.npm-global/bin:$PATH
+```
+
+**Q: Application won't start after installation**
+A: 
+1. Check Node.js version: `node --version` (must be 18+)
+2. Clear cache: `npm cache clean --force`
+3. Reinstall: `rm -rf node_modules && npm install`
+
+### Usage
+
+**Q: How do I create an agent?**
+A: Click "+ New Agent" in the sidebar, give your agent a name and project path, then click "Create Agent".
+
+**Q: Can I use multiple AI providers?**
+A: Yes! Go to Settings > AI Providers to configure multiple providers (OpenAI, Anthropic, etc.). You can set a default provider or specify per-agent.
+
+**Q: How do permissions work?**
+A: 
+- **Ask**: Agent asks before each action
+- **Auto-accept edits**: Auto-accepts file edits, asks for commands
+- **Plan**: Only analyzes, doesn't make changes
+- **Bypass**: No permission prompts (use with caution)
+
+**Q: Can I use my own fine-tuned models?**
+A: Yes! Configure custom providers in Settings > AI Providers with your fine-tuned model endpoints.
+
+### Features
+
+**Q: What are Skills?**
+A: Skills are reusable AI capabilities (code review, refactoring, testing) that can be applied to agents. See the Skills panel for available options.
+
+**Q: How do worktrees work?**
+A: Git worktrees let you work on multiple branches simultaneously. Create a worktree from the Worktrees panel - each gets its own isolated directory.
+
+**Q: Can I automate tasks?**
+A: Yes! Use the Automation panel to create scheduled tasks, git hooks, or file watchers.
+
+### Troubleshooting
+
+**Q: API key errors**
+A: 
+```bash
+# Set environment variable
+export OPENAI_API_KEY=sk-your-key
+# Or configure in Settings UI
+```
+
+**Q: Slow performance**
+A:
+- Close unused agents
+- Reduce context window size in settings
+- Use a faster model (gpt-4o-mini)
+- Check system resources
+
+**Q: Database locked**
+A:
+```bash
+pkill -f codex
+rm ~/.config/codex/codex.db
+npm run dev
+```
+
+**Q: Extension not working**
+A: Reload VS Code: `Developer: Reload Window` from command palette
+
+---
+
 ## Troubleshooting
 
 ### Common Issues

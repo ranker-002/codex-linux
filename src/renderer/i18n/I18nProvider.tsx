@@ -13,6 +13,14 @@ interface I18nContextType {
   t: TranslationKeys;
   setLanguage: (lang: Language) => void;
   availableLanguages: typeof languageNames;
+  isRTL: boolean;
+  dir: 'ltr' | 'rtl';
+}
+
+const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'] as const;
+
+export function isRTL(lang: string): boolean {
+  return RTL_LANGUAGES.includes(lang as typeof RTL_LANGUAGES[number]);
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
@@ -45,20 +53,27 @@ export function I18nProvider({
     
     document.documentElement.lang = language;
     document.documentElement.setAttribute('data-lang', language);
+    document.documentElement.dir = isRTL(language) ? 'rtl' : 'ltr';
   }, [language]);
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
   }, []);
 
+  const dir = isRTL(language) ? 'rtl' : 'ltr';
+
   return (
     <I18nContext.Provider value={{ 
       language, 
       t, 
       setLanguage,
-      availableLanguages: languageNames 
+      availableLanguages: languageNames,
+      isRTL: isRTL(language),
+      dir
     }}>
-      {children}
+      <div dir={dir}>
+        {children}
+      </div>
     </I18nContext.Provider>
   );
 }
@@ -74,13 +89,13 @@ export function useI18n(): I18nContextType {
 }
 
 export function useTranslation() {
-  const { t, language, setLanguage, availableLanguages } = useI18n();
+  const { t, language, setLanguage, availableLanguages, isRTL } = useI18n();
   
   return {
     t,
     language,
     setLanguage,
     availableLanguages,
-    isRTL: false
+    isRTL
   };
 }

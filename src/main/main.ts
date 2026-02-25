@@ -250,6 +250,48 @@ async function initializeServices(): Promise<void> {
     await agentOrchestrator.initialize();
     log.info('Agent orchestrator initialized');
 
+    agentOrchestrator.on('changes:created', (payload: { agentId: string; changeId: string }) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('changes:created', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:taskCompleted', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:taskCompleted', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:taskStarted', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:taskStarted', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:taskFailed', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:taskFailed', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:paused', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:paused', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:resumed', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:resumed', payload);
+      }
+    });
+
+    agentOrchestrator.on('agent:stopped', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:stopped', payload);
+      }
+    });
+
     // Initialize backup manager
     backupManager = new BackupManager();
     await backupManager.initialize();
@@ -457,6 +499,16 @@ async function cleanup(): Promise<void> {
     tray?.destroy();
     tray = null;
     
+    if (agentOrchestrator) {
+      agentOrchestrator.removeAllListeners('changes:created');
+      agentOrchestrator.removeAllListeners('agent:taskCompleted');
+      agentOrchestrator.removeAllListeners('agent:taskStarted');
+      agentOrchestrator.removeAllListeners('agent:taskFailed');
+      agentOrchestrator.removeAllListeners('agent:paused');
+      agentOrchestrator.removeAllListeners('agent:resumed');
+      agentOrchestrator.removeAllListeners('agent:stopped');
+    }
+
     await Promise.all([
       agentOrchestrator?.cleanup(),
       automationScheduler?.cleanup(),
@@ -466,6 +518,7 @@ async function cleanup(): Promise<void> {
       mcpManager?.cleanup(),
       githubPRMonitor?.cleanup(),
       backupManager?.cleanup?.(),
+      auditLogger?.cleanup?.(),
       dbManager?.close()
     ]);
     
@@ -495,14 +548,20 @@ function setupIPC(): void {
 
   // File system operations
   ipcMain.handle('dialog:selectFolder', async () => {
-    const result = await dialog.showOpenDialog(mainWindow!, {
+    if (!mainWindow) {
+      throw new Error('No main window available');
+    }
+    const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory']
     });
     return result.filePaths[0] || null;
   });
 
   ipcMain.handle('dialog:selectFile', async (event, filters) => {
-    const result = await dialog.showOpenDialog(mainWindow!, {
+    if (!mainWindow) {
+      throw new Error('No main window available');
+    }
+    const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'],
       filters
     });
@@ -691,7 +750,11 @@ function setupIPC(): void {
   // File system operations
   ipcMain.handle('fs:readdir', async (event, dirPath: string, options?: { withFileTypes?: boolean }) => {
     try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      const normalizedPath = path.normalize(dirPath);
+      if (normalizedPath.includes('..')) {
+        throw new Error('Path traversal not allowed');
+      }
+      const entries = await fs.readdir(normalizedPath, { withFileTypes: true });
       return entries.map((entry: any) => ({
         name: entry.name,
         isDirectory: entry.isDirectory(),
@@ -705,7 +768,11 @@ function setupIPC(): void {
 
   ipcMain.handle('fs:readFile', async (event, filePath: string, encoding?: BufferEncoding) => {
     try {
-      const content = await fs.readFile(filePath, encoding || 'utf-8');
+      const normalizedPath = path.normalize(filePath);
+      if (normalizedPath.includes('..')) {
+        throw new Error('Path traversal not allowed');
+      }
+      const content = await fs.readFile(normalizedPath, encoding || 'utf-8');
       return content;
     } catch (error) {
       log.error('Failed to read file:', error);
@@ -717,11 +784,12 @@ function setupIPC(): void {
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('File path is required');
     }
-    if (filePath.includes('..')) {
-      throw new Error('Path traversal not allowed');
+    const normalizedPath = path.normalize(filePath);
+    if (normalizedPath.includes('..') || normalizedPath.startsWith('/etc') || normalizedPath.startsWith('/root') || normalizedPath.startsWith('/sys') || normalizedPath.startsWith('/proc')) {
+      throw new Error('Path traversal or restricted path not allowed');
     }
     try {
-      await fs.writeFile(filePath, content, 'utf-8');
+      await fs.writeFile(normalizedPath, content, 'utf-8');
     } catch (error) {
       log.error('Failed to write file:', error);
       throw error;
@@ -730,7 +798,11 @@ function setupIPC(): void {
 
   ipcMain.handle('fs:stat', async (event, filePath: string) => {
     try {
-      const stats = await fs.stat(filePath);
+      const normalizedPath = path.normalize(filePath);
+      if (normalizedPath.includes('..')) {
+        throw new Error('Path traversal not allowed');
+      }
+      const stats = await fs.stat(normalizedPath);
       return {
         isFile: stats.isFile(),
         isDirectory: stats.isDirectory(),
@@ -745,7 +817,44 @@ function setupIPC(): void {
   });
 
   // Terminal operations
-  let currentTerminalProcess: ChildProcess | null = null;
+  const ALLOWED_COMMANDS = new Set([
+    'npm', 'node', 'pnpm', 'yarn', 'bun', 'deno',
+    'git', 'docker', 'docker-compose', 'kubectl',
+    'python', 'python3', 'pip', 'pip3',
+    'make', 'cmake', 'gcc', 'g++', 'clang', 'rustc',
+    'cargo', 'go', 'java', 'javac', 'gradle', 'maven',
+    'ls', 'cat', 'grep', 'find', 'chmod', 'chown', 'mkdir', 'rm', 'rmdir', 'cp', 'mv', 'touch',
+    'code', 'codex', 'opencode'
+  ]);
+  const terminalProcesses = new Map<number, ChildProcess>();
+  let terminalIdCounter = 0;
+
+  function parseCommandLine(command: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+    
+    for (let i = 0; i < command.length; i++) {
+      const char = command[i];
+      if ((char === '"' || char === "'") && !inQuote) {
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === quoteChar && inQuote) {
+        inQuote = false;
+        quoteChar = '';
+      } else if (char === ' ' && !inQuote) {
+        if (current) {
+          args.push(current);
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    }
+    if (current) args.push(current);
+    return args;
+  }
 
   ipcMain.handle('terminal:execute', async (event, { command, cwd }: { command: string; cwd: string }) => {
     if (!command || typeof command !== 'string') {
@@ -754,29 +863,47 @@ function setupIPC(): void {
     if (!cwd || typeof cwd !== 'string') {
       throw new Error('CWD is required');
     }
+
+    const parsedArgs = parseCommandLine(command);
+    if (parsedArgs.length === 0) {
+      throw new Error('Command is required');
+    }
+
+    const cmd = parsedArgs[0];
+    const args = parsedArgs.slice(1);
+
+    if (!ALLOWED_COMMANDS.has(cmd)) {
+      throw new Error(`Command "${cmd}" is not allowed. Allowed commands: ${[...ALLOWED_COMMANDS].join(', ')}`);
+    }
+
+    const currentTerminalId = ++terminalIdCounter;
     
     return new Promise((resolve) => {
-      const [cmd, ...args] = command.split(' ');
-      
-      currentTerminalProcess = spawn(cmd, args, {
+      const proc = spawn(cmd, args, {
         cwd,
-        shell: true,
+        shell: false,
         env: { ...process.env, FORCE_COLOR: '1' }
       });
+
+      terminalProcesses.set(currentTerminalId, proc);
 
       let stdout = '';
       let stderr = '';
 
-      currentTerminalProcess.stdout?.on('data', (data) => {
+      proc.stdout?.on('data', (data) => {
         stdout += data.toString();
       });
 
-      currentTerminalProcess.stderr?.on('data', (data) => {
+      proc.stderr?.on('data', (data) => {
         stderr += data.toString();
       });
 
-      currentTerminalProcess.on('close', (code) => {
-        currentTerminalProcess = null;
+      const cleanup = () => {
+        terminalProcesses.delete(currentTerminalId);
+      };
+
+      proc.on('close', (code) => {
+        cleanup();
         resolve({
           stdout,
           stderr,
@@ -785,8 +912,8 @@ function setupIPC(): void {
         });
       });
 
-      currentTerminalProcess.on('error', (error) => {
-        currentTerminalProcess = null;
+      proc.on('error', (error) => {
+        cleanup();
         resolve({
           stdout,
           stderr,
@@ -798,9 +925,9 @@ function setupIPC(): void {
   });
 
   ipcMain.handle('terminal:kill', () => {
-    if (currentTerminalProcess) {
-      currentTerminalProcess.kill();
-      currentTerminalProcess = null;
+    for (const [id, proc] of terminalProcesses) {
+      proc.kill();
+      terminalProcesses.delete(id);
     }
   });
 
@@ -819,6 +946,48 @@ function setupIPC(): void {
 
   ipcMain.handle('changes:apply', async (event, changeId: string) => {
     return await dbManager.applyCodeChange(changeId);
+  });
+
+  // Checkpoints operations
+  ipcMain.handle('checkpoints:list', async (event, agentId?: string) => {
+    return await dbManager.listCheckpoints(agentId);
+  });
+
+  ipcMain.handle('checkpoints:restore', async (event, checkpointId: string) => {
+    return await dbManager.restoreCheckpoint(checkpointId);
+  });
+
+  ipcMain.handle('checkpoints:restoreLast', async (event, agentId: string) => {
+    return await dbManager.restoreLastCheckpoint(agentId);
+  });
+
+  // Agent queue operations
+  ipcMain.handle('queue:list', async (event, agentId: string) => {
+    return await dbManager.listAgentQueueItems(agentId);
+  });
+
+  ipcMain.handle('queue:enqueue', async (event, agentId: string, type: 'message' | 'task', content: string) => {
+    return await dbManager.enqueueAgentQueueItem(agentId, type, content);
+  });
+
+  ipcMain.handle('queue:delete', async (event, agentId: string, itemId: string) => {
+    return await dbManager.deleteAgentQueueItem(agentId, itemId);
+  });
+
+  ipcMain.handle('queue:moveUp', async (event, agentId: string, itemId: string) => {
+    return await dbManager.moveAgentQueueItemUp(agentId, itemId);
+  });
+
+  ipcMain.handle('queue:claimNext', async (event, agentId: string) => {
+    return await dbManager.claimNextAgentQueueItem(agentId);
+  });
+
+  ipcMain.handle('queue:complete', async (event, agentId: string, itemId: string, outcome: 'completed' | 'failed', error?: string) => {
+    return await dbManager.completeAgentQueueItem(agentId, itemId, outcome, error);
+  });
+
+  ipcMain.handle('queue:history', async (event, agentId: string, limit?: number) => {
+    return await dbManager.getQueueHistory(agentId, limit);
   });
 
   // Git operations
@@ -884,7 +1053,19 @@ function setupIPC(): void {
     }
   });
 
-  // Notifications
+  // Audit log operations
+  ipcMain.handle('audit:recent', async (event, limit: number = 100) => {
+    return await auditLogger.getRecentEvents(limit);
+  });
+
+  ipcMain.handle('audit:byAction', async (event, action: string, limit: number = 100) => {
+    return await auditLogger.getEventsByAction(action, limit);
+  });
+
+  ipcMain.handle('audit:export', async (event, exportPath: string) => {
+    await auditLogger.exportLogs(exportPath);
+    return { success: true };
+  });
   ipcMain.handle('notification:show', (event, { title, body }: { title: string; body: string }) => {
     if (Notification.isSupported()) {
       new Notification({
@@ -916,23 +1097,57 @@ function setupIPC(): void {
 
   ipcMain.handle('data:import', async (event, importPath: string) => {
     try {
-      const content = await fs.readFile(importPath, 'utf-8');
-      const data = JSON.parse(content);
-      
+      const normalizedPath = path.normalize(importPath);
+      if (normalizedPath.includes('..')) {
+        throw new Error('Path traversal not allowed');
+      }
+      const content = await fs.readFile(normalizedPath, 'utf-8');
+      let data: any;
+      try {
+        data = JSON.parse(content);
+      } catch {
+        throw new Error('Invalid JSON format');
+      }
+
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid import data: must be an object');
+      }
+
       if (data.agents) {
+        if (!Array.isArray(data.agents)) {
+          throw new Error('Invalid import data: agents must be an array');
+        }
         for (const agent of data.agents) {
+          if (!agent.name || !agent.projectPath || typeof agent.name !== 'string' || typeof agent.projectPath !== 'string') {
+            throw new Error('Invalid agent: name and projectPath are required strings');
+          }
+          if (agent.projectPath.includes('..') || agent.projectPath.startsWith('/etc') || agent.projectPath.startsWith('/root')) {
+            throw new Error('Invalid agent projectPath: path traversal or restricted path not allowed');
+          }
           await dbManager.createAgent(agent);
         }
       }
       
       if (data.automations) {
+        if (!Array.isArray(data.automations)) {
+          throw new Error('Invalid import data: automations must be an array');
+        }
         for (const automation of data.automations) {
+          if (!automation.name || !automation.trigger) {
+            throw new Error('Invalid automation: name and trigger are required');
+          }
           await automationScheduler.createAutomation(automation);
         }
       }
       
       if (data.settings) {
+        if (typeof data.settings !== 'object' || Array.isArray(data.settings)) {
+          throw new Error('Invalid import data: settings must be an object');
+        }
         for (const [key, value] of Object.entries(data.settings)) {
+          if (typeof key !== 'string') {
+            throw new Error('Invalid settings: keys must be strings');
+          }
           settingsManager.setAny(key, value);
         }
       }

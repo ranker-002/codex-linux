@@ -17,11 +17,11 @@ interface Metric {
 export class MetricsCollector extends EventEmitter {
   private metrics: Map<string, Metric> = new Map();
   private retentionMs = 24 * 60 * 60 * 1000; // 24 hours
+  private cleanupInterval: NodeJS.Timeout | undefined;
 
   constructor() {
     super();
-    // Clean up old metrics periodically
-    setInterval(() => this.cleanup(), 60 * 60 * 1000); // Every hour
+    this.cleanupInterval = setInterval(() => this.cleanup(), 60 * 60 * 1000); // Every hour
   }
 
   // Counter - cumulative metric
@@ -163,6 +163,13 @@ export class MetricsCollector extends EventEmitter {
     }
 
     log.debug('Metrics cleanup completed');
+  }
+
+  public stop(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
   }
 }
 

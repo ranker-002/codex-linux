@@ -1,5 +1,6 @@
 import { SecurityManager } from '../../src/main/security/SecurityManager';
 import crypto from 'crypto';
+import * as fs from 'fs/promises';
 
 jest.mock('electron', () => ({
   app: {
@@ -18,6 +19,10 @@ describe('SecurityManager', () => {
 
   describe('encrypt/decrypt', () => {
     beforeEach(async () => {
+      (fs.readFile as unknown as jest.Mock).mockRejectedValue(new Error('no key'));
+      (fs.mkdir as unknown as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as unknown as jest.Mock).mockResolvedValue(undefined);
+
       await securityManager.initialize();
     });
 

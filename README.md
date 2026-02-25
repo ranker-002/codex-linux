@@ -14,21 +14,50 @@ A Linux port of OpenAI Codex - A powerful command center for managing multiple A
 
 ## Installation
 
-### Prerequisites
+### Quick Install (Recommended)
 
-- Node.js 18+ 
-- Git
-- Linux (Ubuntu 20.04+, Fedora 35+, or Arch Linux)
+```bash
+curl -fsSL https://raw.githubusercontent.com/ranker-002/codex-linux/master/scripts/install.sh | bash
+```
+
+This will install Codex Linux to `~/.local/bin` and add it to your PATH.
+
+### Via npm
+
+```bash
+npm install -g codex-linux
+```
+
+### System-wide Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ranker-002/codex-linux/master/scripts/install.sh | sudo bash -s -- --system
+```
+
+### Download AppImage
+
+Download the latest AppImage from [GitHub Releases](https://github.com/ranker-002/codex-linux/releases/latest):
+
+```bash
+# Download
+wget https://github.com/ranker-002/codex-linux/releases/latest/download/Codex.Linux-1.0.1.AppImage
+
+# Make executable
+chmod +x Codex.Linux-1.0.1.AppImage
+
+# Run
+./Codex.Linux-1.0.1.AppImage
+```
 
 ### From Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/codex-linux.git
+git clone https://github.com/ranker-002/codex-linux.git
 cd codex-linux
 
 # Install dependencies
-npm install
+pnpm install
 
 # Build the application
 npm run build
@@ -40,18 +69,13 @@ npm run dev
 npm run package:linux
 ```
 
-### Pre-built Packages
-
-Download the latest release:
-
-- **AppImage** (Universal): `Codex-Linux-1.0.0.AppImage`
-- **Debian/Ubuntu**: `codex-linux_1.0.0_amd64.deb`
-- **Fedora/RHEL**: `codex-linux-1.0.0.x86_64.rpm`
-- **Arch Linux**: `codex-linux-1.0.0.pacman`
-
 ## Quick Start
 
-1. **Launch Codex Linux** - Run the application from your applications menu or terminal
+1. **Launch Codex Linux** - Run the application from your applications menu or terminal:
+
+   ```bash
+   codex-linux
+   ```
 
 2. **Configure AI Provider**:
    - Go to Settings → AI Providers
@@ -164,6 +188,12 @@ codex-linux/
 
 ## Development
 
+### Prerequisites
+
+- Node.js 18+
+- pnpm (recommended) or npm
+- Git
+
 ### Running Tests
 
 ```bash
@@ -181,6 +211,14 @@ npm run lint:fix
 
 ```bash
 npm run typecheck
+```
+
+## Uninstall
+
+```bash
+codex-linux --uninstall
+# or
+~/.local/bin/uninstall-codex-linux.sh
 ```
 
 ## Contributing
@@ -204,6 +242,5 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/yourusername/codex-linux/issues)
-- Documentation: [Full documentation](https://codex-linux.readthedocs.io)
-- Discord: [Join our community](https://discord.gg/codex-linux)
+- GitHub Issues: [Report bugs or request features](https://github.com/ranker-002/codex-linux/issues)
+- GitHub Releases: [Download latest version](https://github.com/ranker-002/codex-linux/releases)

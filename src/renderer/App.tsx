@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { AgentPanel } from './components/AgentPanel';
@@ -8,11 +8,16 @@ import { SkillsPanel } from './components/SkillsPanel';
 import { AutomationPanel } from './components/AutomationPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { CodeWorkspace } from './components/CodeWorkspace';
+import { AuditTrailPanel } from './components/AuditTrailPanel';
+import { WelcomeChat } from './components/WelcomeChat';
 import { I18nProvider } from './i18n/I18nProvider';
 import { Agent, Worktree, Skill, Automation, AIProvider, Settings } from '../shared/types';
-import './styles/minimalist.css';
+import './styles/abyss-teal.css';
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [agents, setAgents] = useState<Agent[]>([]);
   const [worktrees, setWorktrees] = useState<Worktree[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -22,6 +27,68 @@ function App() {
   const [activeTab, setActiveTab] = useState('agents');
   const [isLoading, setIsLoading] = useState(true);
   const [streamingContent, setStreamingContent] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/') {
+      setActiveTab('chat');
+      return;
+    }
+    if (path.startsWith('/agents')) {
+      setActiveTab('agents');
+      return;
+    }
+    if (path.startsWith('/code')) {
+      setActiveTab('code');
+      return;
+    }
+    if (path.startsWith('/worktrees')) {
+      setActiveTab('worktrees');
+      return;
+    }
+    if (path.startsWith('/skills')) {
+      setActiveTab('skills');
+      return;
+    }
+    if (path.startsWith('/automations')) {
+      setActiveTab('automations');
+      return;
+    }
+    if (path.startsWith('/settings')) {
+      setActiveTab('settings');
+      return;
+    }
+    setActiveTab('chat');
+  }, [location.pathname]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    switch (tab) {
+      case 'chat':
+        navigate('/');
+        break;
+      case 'agents':
+        navigate('/agents');
+        break;
+      case 'code':
+        navigate('/code');
+        break;
+      case 'worktrees':
+        navigate('/worktrees');
+        break;
+      case 'skills':
+        navigate('/skills');
+        break;
+      case 'automations':
+        navigate('/automations');
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      default:
+        navigate('/');
+    }
+  };
 
   useEffect(() => {
     loadInitialData();
@@ -158,12 +225,15 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[var(--color-bg-primary)]" data-testid="app-loading">
+      <div 
+        className="flex items-center justify-center h-screen bg-[var(--bg-void)]"
+        data-testid="app-loading"
+      >
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <div className="w-12 h-12 rounded-full border-2 border-neutral-200 border-t-neutral-800 animate-spin" />
+            <div className="w-12 h-12 rounded-full border-2 border-[var(--border-default)] border-t-[var(--teal-500)] animate-spin" />
           </div>
-          <p className="text-sm text-neutral-500 animate-pulse">Loading Codex...</p>
+          <p className="text-sm text-[var(--text-muted)] animate-pulse">Loading Codex...</p>
         </div>
       </div>
     );
@@ -171,20 +241,39 @@ function App() {
 
   return (
     <I18nProvider>
-      <div className="flex h-screen bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] overflow-hidden selection:bg-neutral-900 selection:text-white" data-testid="app-container">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <div 
+        className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
+        data-testid="app-container"
+      >
+        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
         
         <div className="flex-1 flex flex-col min-w-0">
-          <Header 
-            activeTab={activeTab}
-            agents={agents}
-            onSettingsClick={() => setActiveTab('settings')}
-          />
+          {activeTab !== 'chat' && (
+            <Header 
+              activeTab={activeTab}
+              agents={agents}
+              onSettingsClick={() => handleTabChange('settings')}
+            />
+          )}
           
-          <main className="flex-1 overflow-hidden animate-fadeIn" data-testid="main-content">
+          <main 
+            className={`flex-1 overflow-hidden animate-fadeIn ${activeTab === 'chat' ? '' : 'bg-[var(--bg-primary)]'}`}
+            data-testid="main-content"
+          >
             <Routes>
               <Route 
                 path="/" 
+                element={
+                  <WelcomeChat 
+                    agents={agents}
+                    providers={providers}
+                    skills={skills}
+                    onCreateAgent={handleCreateAgent}
+                  />
+                } 
+              />
+              <Route 
+                path="/agents" 
                 element={
                   <AgentPanel 
                     agents={agents}
@@ -229,6 +318,10 @@ function App() {
                     onCreateAutomation={handleCreateAutomation}
                   />
                 } 
+              />
+              <Route 
+                path="/audit" 
+                element={<AuditTrailPanel />} 
               />
               <Route 
                 path="/settings" 

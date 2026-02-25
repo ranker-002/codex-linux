@@ -1,6 +1,11 @@
 import { GitWorktreeManager } from '../../src/main/git/GitWorktreeManager';
 import simpleGit from 'simple-git';
 
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  rmdir: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('simple-git');
 
 describe('GitWorktreeManager', () => {
@@ -14,7 +19,11 @@ describe('GitWorktreeManager', () => {
       branchLocal: jest.fn().mockResolvedValue({ all: [] }),
       checkoutBranch: jest.fn().mockResolvedValue(undefined),
       deleteLocalBranch: jest.fn().mockResolvedValue(undefined),
-      revparse: jest.fn().mockResolvedValue('abc123'),
+      revparse: jest.fn().mockImplementation(async (args: string[]) => {
+        if (Array.isArray(args) && args.includes('--show-toplevel')) return '/repo';
+        if (Array.isArray(args) && args.includes('--abbrev-ref')) return 'main';
+        return 'abc123';
+      }),
       raw: jest.fn().mockResolvedValue(''),
       status: jest.fn().mockResolvedValue({
         staged: [],
@@ -38,7 +47,7 @@ describe('GitWorktreeManager', () => {
       expect(worktree.branch).toBe('codex/test-worktree');
       expect(mockGit.checkoutBranch).toHaveBeenCalledWith(
         'codex/test-worktree',
-        'abc123'
+        'main'
       );
     });
 
@@ -75,7 +84,7 @@ describe('GitWorktreeManager', () => {
 
       expect(worktrees).toHaveLength(2);
       expect(worktrees[0].isMain).toBe(true);
-      expect(worktrees[1].branch).toBe('refs/heads/codex/test');
+      expect(worktrees[1].branch).toBe('codex/test');
     });
 
     it('should return empty array on error', async () => {

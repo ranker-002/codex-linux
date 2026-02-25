@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+
+/**
+ * Codex Linux Launcher
+ * Launches the AppImage after ensuring it's downloaded
+ */
+
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+const APP_NAME = 'Codex Linux';
+const BINARY_NAME = 'codex-linux';
+const REPO = 'ranker-org/codex-linux-app';
+
+function getArch() {
+    const arch = process.arch;
+    switch (arch) {
+        case 'x64': return 'x64';
+        case 'arm64': return 'arm64';
+        default:
+            console.error(`Unsupported architecture: ${arch}`);
+            process.exit(1);
+    }
+}
+
+function getAppImagePath() {
+    const installDir = path.join(os.homedir(), '.local', 'bin');
+    return path.join(installDir, `${BINARY_NAME}.AppImage`);
+}
+
+function checkAppImageExists() {
+    const appImagePath = getAppImagePath();
+    return fs.existsSync(appImagePath);
+}
+
+function launchAppImage(args) {
+    const appImagePath = getAppImagePath();
+
+    if (!fs.existsSync(appImagePath)) {
+        console.error(`${APP_NAME} is not installed.`);
+        console.error('Run: npm install -g codex-linux');
+        process.exit(1);
+    }
+
+    // Launch the AppImage
+    const child = spawn(appImagePath, args, {
+        detached: true,
+        stdio: 'ignore'
+    });
+
+    child.unref();
+    console.log(`${APP_NAME} launched!`);
+}
+
+function showHelp() {
+    console.log(`${APP_NAME} - Multi-agent AI coding command center`);
+    console.log('');
+    console.log('Usage: codex-linux [options]');
+    console.log('');
+    console.log('Options:');
+    console.log('  --version    Show version');
+    console.log('  --help       Show this help');
+    console.log('  --update     Update to latest version');
+    console.log('  --uninstall  Remove Codex Linux');
+    console.log('');
+    console.log('For more info: https://github.com/' + REPO);
+}
+
+function showVersion() {
+    const pkgPath = path.join(__dirname, '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    console.log(`${APP_NAME} v${pkg.version}`);
+}
+
+function main() {
+    const args = process.argv.slice(2);
+
+    if (args.includes('--help') || args.includes('-h')) {
+        showHelp();
+        return;
+    }
+
+    if (args.includes('--version') || args.includes('-v')) {
+        showVersion();
+        return;
+    }
+
+    if (args.includes('--uninstall')) {
+        const uninstallScript = path.join(os.homedir(), '.local', 'bin', 'uninstall-codex-linux.sh');
+        if (fs.existsSync(uninstallScript)) {
+            spawn('bash', [uninstallScript], { stdio: 'inherit' });
+        } else {
+            console.error('Uninstall script not found. Run manually:');
+            console.error('rm ~/.local/bin/codex-linux ~/.local/bin/codex-linux.AppImage');
+        }
+        return;
+    }
+
+    if (args.includes('--update')) {
+        console.log('Updating Codex Linux...');
+        const downloadScript = path.join(__dirname, '..', 'lib', 'download.js');
+        spawn('node', [downloadScript, '--force'], { stdio: 'inherit' });
+        return;
+    }
+
+    if (!checkAppImageExists()) {
+        console.error(`${APP_NAME} AppImage not found.`);
+        console.error('Running post-install download...');
+        const downloadScript = path.join(__dirname, '..', 'lib', 'download.js');
+        spawn('node', [downloadScript], { stdio: 'inherit' }).on('close', (code) => {
+            if (code === 0) {
+                launchAppImage(args);
+            } else {
+                console.error('Download failed. Please check your internet connection.');
+                process.exit(1);
+            }
+        });
+        return;
+    }
+
+    launchAppImage(args);
+}
+
+main();

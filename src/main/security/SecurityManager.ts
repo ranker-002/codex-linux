@@ -2,6 +2,9 @@ import crypto from 'crypto';
 import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import log from 'electron-log';
+
+const API_KEYS = new Set<string>();
 
 export class SecurityManager {
   private algorithm = 'aes-256-gcm';
@@ -14,15 +17,48 @@ export class SecurityManager {
 
   async initialize(): Promise<void> {
     try {
-      // Try to load existing key
       const keyData = await fs.readFile(this.keyFile);
       this.masterKey = keyData;
     } catch {
-      // Generate new key if doesn't exist
       this.masterKey = crypto.randomBytes(32);
       await fs.mkdir(path.dirname(this.keyFile), { recursive: true });
       await fs.writeFile(this.keyFile, this.masterKey, { mode: 0o600 });
     }
+    await this.loadApiKeys();
+  }
+
+  private async loadApiKeys(): Promise<void> {
+    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.enc');
+    try {
+      const encryptedData = await fs.readFile(apiKeysPath, 'utf-8');
+      const keys = JSON.parse(this.decrypt(encryptedData)) as string[];
+      keys.forEach((k) => API_KEYS.add(k));
+    } catch {
+      const defaultKey = crypto.randomBytes(32).toString('hex');
+      API_KEYS.add(defaultKey);
+      await this.saveApiKeys();
+      log.info('Generated new default API key');
+    }
+  }
+
+  private async saveApiKeys(): Promise<void> {
+    const apiKeysPath = path.join(app.getPath('userData'), 'api-keys.enc');
+    const encrypted = this.encrypt(JSON.stringify([...API_KEYS]));
+    await fs.writeFile(apiKeysPath, encrypted, { mode: 0o600 });
+  }
+
+  async validateApiKey(apiKey: string): Promise<boolean> {
+    return API_KEYS.has(apiKey);
+  }
+
+  async addApiKey(apiKey: string): Promise<void> {
+    API_KEYS.add(apiKey);
+    await this.saveApiKeys();
+  }
+
+  async removeApiKey(apiKey: string): Promise<void> {
+    API_KEYS.delete(apiKey);
+    await this.saveApiKeys();
   }
 
   encrypt(text: string): string {
@@ -38,7 +74,6 @@ export class SecurityManager {
     
     const authTag = (cipher as any).getAuthTag();
     
-    // Return IV + authTag + encrypted data
     return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
   }
 
@@ -74,23 +109,21 @@ export class SecurityManager {
   }
 
   async rotateKey(): Promise<void> {
-    // Decrypt all existing data with old key
-    // Generate new key
-    // Re-encrypt all data with new key
-    // Save new key
     const newKey = crypto.randomBytes(32);
     
-    // Backup old key
     const backupFile = this.keyFile + '.backup';
     await fs.copyFile(this.keyFile, backupFile);
     
-    // Save new key
     await fs.writeFile(this.keyFile, newKey, { mode: 0o600 });
     
     this.masterKey = newKey;
+    await this.saveApiKeys();
   }
 
-  // Secure comparison to prevent timing attacks
+  async reEncryptData(_dataMap: Map<string, string>): Promise<void> {
+    throw new Error('Key rotation with data re-encryption is not yet implemented. All encrypted data will become unreadable after key rotation. Manual intervention required.');
+  }
+
   secureCompare(a: string, b: string): boolean {
     if (a.length !== b.length) {
       return false;
