@@ -131,8 +131,6 @@ export interface ElectronAPI {
   removeListener: (channel: string, callback: (...args: any[]) => void) => void;
 }
 
-declare global {
-  interface Window {
-    electronAPI: ElectronAPI;
-  }
+interface Window {
+  electronAPI?: ElectronAPI;
 }

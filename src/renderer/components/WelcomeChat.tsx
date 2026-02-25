@@ -1,6 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Agent, AIProvider, Skill } from '../../shared/types';
-import { Send, Sparkles, Code2, GitBranch, Wrench, Clock, Bot, X } from 'lucide-react';
+import {
+  ArrowUp,
+  Folder,
+  Monitor,
+  GitBranch,
+  ImagePlus,
+  Sparkles,
+} from 'lucide-react';
 
 interface WelcomeChatProps {
   agents: Agent[];
@@ -10,49 +17,65 @@ interface WelcomeChatProps {
 }
 
 const FREE_MODELS = [
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', backend: 'openrouter' },
-  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1', backend: 'openrouter' },
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', backend: 'openrouter' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', providerId: 'free' },
+  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1', providerId: 'free' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', providerId: 'free' },
 ];
 
 export const WelcomeChat: React.FC<WelcomeChatProps> = ({
   agents,
   providers,
   skills,
-  onCreateAgent
+  onCreateAgent,
 }) => {
   const [input, setInput] = useState('');
-  const [activeTab, setActiveTab] = useState('Cowork');
-  const [selectedModel] = useState(FREE_MODELS[0].id);
+  const [workspacePath, setWorkspacePath] = useState(process.cwd());
+  const [selectedRuntime, setSelectedRuntime] = useState('local');
+  const [selectedModel, setSelectedModel] = useState(FREE_MODELS[0].id);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const runtimeOptions = useMemo(() => {
+    const base = [{ id: 'local', label: 'Local' }];
+    const providerOptions = providers.slice(0, 3).map((p) => ({ id: p.id, label: p.name }));
+    return [...base, ...providerOptions];
+  }, [providers]);
+
   const suggestions = [
-    { icon: Code2, text: 'Optimize my workflow' },
-    { icon: GitBranch, text: 'Organize my files' },
-    { icon: Wrench, text: 'Find insights in data' },
-    { icon: Clock, text: 'Build an automation' },
+    { title: 'Create or update my', chip: 'CLAUDE.md', suffix: 'file' },
+    { title: 'Search for a', chip: 'TODO', suffix: 'comment and fix it' },
+    { title: 'Recommend areas to improve our', chip: 'tests', suffix: '' },
   ];
 
-  const files = [
-    { name: 'Project Constitution v4', lines: 491, type: 'TEXT' },
-    { name: 'Task Breakdown', lines: 566, type: 'TEXT' },
-    { name: 'Implementation Plan', lines: 390, type: 'TEXT' },
-  ];
+  const openFolderPicker = async () => {
+    try {
+      const path = await window.electronAPI.dialog.selectFolder();
+      if (path) {
+        setWorkspacePath(path);
+      }
+    } catch (error) {
+      console.error('Failed to select folder:', error);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    
+
     try {
+      const runtimeProvider = runtimeOptions.find((runtime) => runtime.id === selectedRuntime);
+      const modelConfig = FREE_MODELS.find((model) => model.id === selectedModel) || FREE_MODELS[0];
+      const providerId = runtimeProvider?.id === 'local' ? modelConfig.providerId : runtimeProvider?.id;
+
       const newAgent = await onCreateAgent({
         name: 'Quick Chat',
-        projectPath: process.cwd(),
-        providerId: 'free',
+        projectPath: workspacePath,
+        providerId,
         model: selectedModel,
-        skills: []
+        skills: [],
       });
-      
-      await window.electronAPI.agent.sendMessage(newAgent.id, input);
+
+      await window.electronAPI.agent.sendMessage(newAgent.id, input.trim());
       setInput('');
+      inputRef.current?.focus();
     } catch (error) {
       console.error('Failed to send message:', error);
     }
@@ -61,139 +84,159 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
   return (
-    <div className="h-full flex relative">
-      <div 
-        className="absolute inset-0 pointer-events-none z-0"
-        style={{
-          backgroundImage: 'radial-gradient(circle, rgba(0,200,168,0.04) 1px, transparent 1px)',
-          backgroundSize: '22px 22px'
-        }}
-      />
-      
-      <div className="absolute w-[600px] h-[400px] -top-[120px] -right-[100px] pointer-events-none z-0"
-        style={{
-          background: 'radial-gradient(ellipse, rgba(0,200,168,0.09) 0%, transparent 65%)'
-        }}
-      />
-      <div className="absolute w-[300px] h-[300px] -bottom-[80px] -left-[60px] pointer-events-none z-0"
-        style={{
-          background: 'radial-gradient(circle, rgba(0,150,130,0.06) 0%, transparent 70%)'
-        }}
-      />
+    <div className="welcome-wrap">
+      <div className="welcome-inner">
+        <div className="welcome-mascot" aria-hidden="true">
+          <span className="welcome-mascot-body" />
+          <span className="welcome-mascot-legs">
+            <span />
+            <span />
+            <span />
+            <span />
+          </span>
+        </div>
 
-      <div className="flex-1 flex flex-col z-10">
-        <div className="h-12 border-b border-[var(--border-subtle)] flex items-center px-5 gap-1">
-          <div className="flex gap-0.5 bg-[var(--bg-elevated)] p-[3px] rounded-lg">
-            {['Chat', 'Cowork', 'Code'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  activeTab === tab
-                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+        <div className="welcome-toolbar">
+          <button
+            onClick={openFolderPicker}
+            className="welcome-select"
+            data-testid="welcome-select-folder"
+          >
+            <span className="welcome-select-leading">
+              <Folder className="welcome-select-icon" />
+              <span className="welcome-select-text">{workspacePath || 'Select folder'}</span>
+            </span>
+            <span className="welcome-select-caret">⌄</span>
+          </button>
+
+          <div className="welcome-runtime-select">
+            <Monitor className="welcome-select-icon" />
+            <select
+              value={selectedRuntime}
+              onChange={(e) => setSelectedRuntime(e.target.value)}
+              className="welcome-runtime-native"
+              data-testid="welcome-runtime"
+            >
+              {runtimeOptions.map((runtime) => (
+                <option key={runtime.id} value={runtime.id}>
+                  {runtime.label}
+                </option>
+              ))}
+            </select>
+            <span className="welcome-select-caret">⌄</span>
           </div>
         </div>
 
-        <div className="flex-1 p-7 flex flex-col gap-5 overflow-hidden">
-          <h1 
-            className="text-[22px] leading-tight tracking-[-0.01em] text-[var(--text-primary)]"
-            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 300 }}
-          >
-            Let's knock something<br />off your list
-          </h1>
+        <div className="welcome-stage">
+          <div className="welcome-main">
+            <div className="welcome-composer">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={4}
+                placeholder="Find a small todo in the codebase and do it"
+                className="welcome-input"
+                data-testid="welcome-input"
+              />
 
-          <div className="grid grid-cols-2 gap-2.5 flex-1">
-            {suggestions.map((sugg, idx) => {
-              const Icon = sugg.icon;
-              return (
+              <div className="welcome-composer-footer">
+                <div className="welcome-composer-tools">
+                  <button className="welcome-composer-tool" title="Attach git context">
+                    <GitBranch className="w-4 h-4" />
+                  </button>
+                  <button className="welcome-composer-tool" title="Attach image">
+                    <ImagePlus className="w-4 h-4" />
+                  </button>
+                  <span className="welcome-composer-meta">
+                    {agents.length} sessions · {skills.length} skills
+                  </span>
+                </div>
+
+                <div className="welcome-composer-actions">
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="welcome-model-select"
+                  >
+                    {FREE_MODELS.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => void handleSend()}
+                    disabled={!input.trim()}
+                    className="welcome-send"
+                    data-testid="welcome-send"
+                  >
+                    <ArrowUp className="w-4 h-4 mx-auto" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="welcome-suggestions">
+              {suggestions.map((suggestion, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setInput(sugg.text)}
-                  className="flex items-center gap-2.5 px-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-left hover:border-[var(--border-accent)] transition-colors group"
+                  onClick={() => setInput(`${suggestion.title} ${suggestion.chip} ${suggestion.suffix}`.trim())}
+                  className="welcome-suggestion"
                 >
-                  <div className="w-7 h-7 rounded-md bg-[rgba(0,200,168,0.08)] border border-[rgba(0,200,168,0.12)] flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-3.5 h-3.5 text-[var(--teal-400)]" />
-                  </div>
-                  <span className="text-[12px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
-                    {sugg.text}
+                  <span className="welcome-suggestion-text">
+                    {suggestion.title}{' '}
+                    <span className="welcome-chip">
+                      {suggestion.chip}
+                    </span>{' '}
+                    {suggestion.suffix}
                   </span>
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            <div className="welcome-warning">
+              <p className="welcome-warning-copy">
+                <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  Claude Code may read, write, or execute files in this folder. This can pose security
+                  risks, so only use Claude Code in trusted repositories.
+                </span>
+              </p>
+            </div>
           </div>
 
-          <div className="bg-[var(--bg-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] px-3.5 py-3 flex gap-2.5 items-center">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="How can I help you today?"
-              className="flex-1 bg-transparent border-none outline-none text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] resize-none leading-normal"
-              rows={1}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="w-7 h-7 rounded-[7px] bg-[var(--teal-500)] flex items-center justify-center disabled:opacity-50 hover:bg-[var(--teal-400)] transition-colors flex-shrink-0"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="var(--bg-void)">
-                <path d="M1 6l9-4-3.5 4L10 10 1 6z"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+          <div className="welcome-right">
+            <div className="welcome-preview">
+              <span className="welcome-preview-chip">
+                <Monitor className="w-3.5 h-3.5" />
+                Preview
+              </span>
+              <div className="welcome-preview-card">
+                <h3>Welcome to Claude Code!</h3>
+                <p>Your coding partner that works directly in your codebase.</p>
 
-      <div className="w-60 bg-[var(--bg-surface)] border-l border-[var(--border-subtle)] p-4 flex flex-col gap-3 z-10 flex-shrink-0">
-        <div>
-          <div className="text-[10px] font-medium tracking-[0.12em] uppercase text-[var(--text-muted)] mb-1">
-            Memory
-          </div>
-          <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2.5 text-[11px] text-[var(--text-secondary)] leading-relaxed">
-            Purpose & context
-            <small className="block text-[var(--text-muted)] text-[10px] mt-0.5">
-              Only you · Updated 14 days ago
-            </small>
-          </div>
-        </div>
+                <div className="welcome-preview-log">
+                  <div>• Task: Find clawed component</div>
+                  <div>• Grep: <code>claw</code></div>
+                  <div>• Read: <code>./components/ClawedCharacter.tsx</code></div>
+                  <div>• Edit: keyframes block</div>
+                </div>
 
-        <div>
-          <div className="text-[10px] font-medium tracking-[0.12em] uppercase text-[var(--text-muted)] mb-1">
-            Files
-          </div>
-          <div className="flex flex-col gap-2">
-            {files.map((file, idx) => (
-              <div key={idx} className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2.5 text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                {file.name}
-                <small className="block text-[var(--text-muted)] text-[10px] mt-0.5">
-                  {file.lines} lines · {file.type}
-                </small>
+                <button className="btn btn-secondary btn-sm">Install runtime dependencies</button>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-auto">
-          <div className="h-1 bg-[var(--bg-hover)] rounded overflow-hidden">
-            <div className="h-full rounded bg-gradient-to-r from-[var(--teal-700)] to-[var(--teal-400)]" style={{ width: '2%' }} />
-          </div>
-          <div className="text-[9px] text-[var(--text-muted)] mt-1.5">
-            2% of project capacity
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default WelcomeChat;

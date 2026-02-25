@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, AIProvider } from '../../shared/types';
-import { Settings as SettingsIcon, Key, Eye, EyeOff, Save, Zap, Check, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Save, Zap, Check, Sparkles } from 'lucide-react';
+import { AppPageLayout } from './layout/AppPageLayout';
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -60,18 +61,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const paidProviders = providers.filter(p => !p.isFree);
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-[var(--border-subtle)]">
-        <div className="flex items-center gap-2 mb-4">
-          <SettingsIcon className="w-5 h-5 text-[var(--teal-400)]" />
-          <h2 
-            className="text-[18px] font-medium text-[var(--text-primary)]"
-            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 300 }}
-          >
-            Settings
-          </h2>
-        </div>
-        
+    <AppPageLayout
+      title="Settings"
+      subtitle="Configure providers, appearance, and defaults"
+      actions={
+        <button
+          onClick={handleSave}
+          className="btn btn-primary"
+        >
+          <Save className="w-4 h-4" />
+          Save Settings
+        </button>
+      }
+      contentClassName="p-0 flex flex-col"
+    >
+      <div className="px-6 pt-4 border-b border-[var(--border-subtle)]">
         <div className="tabs">
           {tabs.map(tab => (
             <button
@@ -158,7 +162,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     type="text"
                     value={localSettings.gitAuthorName}
                     onChange={e => setLocalSettings({ ...localSettings, gitAuthorName: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:border-[var(--teal-500)]"
+                    className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:border-[var(--a-500)]"
                     placeholder="Your Name"
                   />
                 </div>
@@ -169,7 +173,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     type="email"
                     value={localSettings.gitAuthorEmail}
                     onChange={e => setLocalSettings({ ...localSettings, gitAuthorEmail: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:border-[var(--teal-500)]"
+                    className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:border-[var(--a-500)]"
                     placeholder="your@email.com"
                   />
                 </div>
@@ -181,7 +185,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {activeTab === 'providers' && (
           <div className="max-w-4xl space-y-6">
             {freeModelsProvider && (
-              <section className="p-4 border-2 border-[rgba(60,200,120,0.3)] bg-[rgba(60,200,120,0.05)] rounded-[var(--radius-lg)]">
+              <section className="p-4 border border-[var(--a-border)] bg-[var(--a-bg-xs)] rounded-[var(--radius-lg)]">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-[var(--success)]" />
                   <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Free AI Models</h3>
@@ -217,7 +221,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-[12px] truncate text-[var(--text-primary)]">{model.name}</span>
                           {selectedModel === model.id && (
-                            <Check className="w-4 h-4 text-[var(--teal-400)] flex-shrink-0" />
+                            <Check className="w-4 h-4 text-[var(--success)] flex-shrink-0" />
                           )}
                         </div>
                         <div className="flex items-center gap-1 mt-1">
@@ -225,7 +229,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                             {model.backend || 'openrouter'}
                           </span>
                           {model.supportsVision && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(136,88,219,0.1)] text-purple-400">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(104,144,244,0.1)] text-[var(--info)]">
                               vision
                             </span>
                           )}
@@ -277,7 +281,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                             type={showApiKeys[provider.id] ? 'text' : 'password'}
                             defaultValue={provider.config.apiKey}
                             placeholder={`Enter ${provider.name} API key`}
-                            className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] pr-10 focus:outline-none focus:border-[var(--teal-500)]"
+                            className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] pr-10 focus:outline-none focus:border-[var(--a-500)]"
                             onBlur={e => handleProviderConfig(provider.id, e.target.value)}
                           />
                           <button
@@ -292,7 +296,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         </div>
                         <button
                           onClick={() => handleProviderConfig(provider.id, provider.config.apiKey || '')}
-                          className="px-3 py-2 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-md)] hover:bg-[var(--teal-400)] text-[13px] font-medium transition-colors"
+                          className="btn btn-secondary"
                         >
                           Test
                         </button>
@@ -347,7 +351,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     onChange={e => setLocalSettings({ ...localSettings, theme: e.target.value as any })}
                     className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)]"
                   >
-                    <option value="dark">Dark (Abyss Teal)</option>
+                    <option value="dark">Dark (Neutral)</option>
+                    <option value="light">Light (Neutral)</option>
                     <option value="system">System</option>
                   </select>
                 </div>
@@ -371,7 +376,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     type="text"
                     value={localSettings.fontFamily}
                     onChange={e => setLocalSettings({ ...localSettings, fontFamily: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--teal-500)]"
+                    className="w-full px-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--a-500)]"
                   />
                 </div>
               </div>
@@ -395,7 +400,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         ...localSettings,
                         shortcuts: { ...localSettings.shortcuts, [action]: e.target.value }
                       })}
-                      className="px-3 py-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] text-[11px] font-[var(--font-mono)] text-[var(--teal-300)] w-32 focus:outline-none focus:border-[var(--teal-500)]"
+                      className="px-3 py-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] text-[11px] font-[var(--font-mono)] text-[var(--text-secondary)] w-32 focus:outline-none focus:border-[var(--a-500)]"
                     />
                   </div>
                 ))}
@@ -404,16 +409,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
         )}
       </div>
-
-      <div className="p-4 border-t border-[var(--border-subtle)] flex justify-end bg-[var(--bg-surface)]">
-        <button
-          onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-sm)] hover:bg-[var(--teal-400)] text-[13px] font-medium transition-colors"
-        >
-          <Save className="w-4 h-4" />
-          Save Settings
-        </button>
-      </div>
-    </div>
+    </AppPageLayout>
   );
 };

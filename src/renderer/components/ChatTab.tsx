@@ -149,13 +149,13 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-[var(--bg-app)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
         <div className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" />
-          <h2 className="font-semibold">Chat</h2>
-          <span className="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded">
+          <MessageSquare className="w-5 h-5 text-[var(--text-muted)]" />
+          <h2 className="font-semibold text-[var(--text-primary)]">Chat</h2>
+          <span className="text-xs text-[var(--text-muted)] px-2 py-0.5 bg-[var(--bg-hover)] rounded">
             No file access
           </span>
         </div>
@@ -163,7 +163,7 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
         {messages.length > 0 && (
           <button
             onClick={handleClear}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-hover)] transition-colors"
           >
             <Trash2 className="w-3 h-3" />
             Clear
@@ -174,14 +174,14 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+          <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
             <Bot className="w-16 h-16 mb-4 opacity-30" />
             <p className="text-lg font-medium mb-2">Welcome to Codex Chat</p>
             <p className="text-sm text-center max-w-md">
               A conversational AI assistant without file access. 
               Great for general questions, coding concepts, and debugging strategies.
             </p>
-            <p className="text-xs mt-4 text-muted-foreground/60">
+            <p className="text-xs mt-4 text-[var(--text-disabled)]">
               For file-based coding tasks, use the Code tab
             </p>
           </div>
@@ -196,12 +196,12 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
             >
               <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                message.role === 'user' ? 'bg-primary/10' : 'bg-muted'
+                message.role === 'user' ? 'bg-[var(--a-bg-xs)]' : 'bg-[var(--bg-hover)]'
               )}>
                 {message.role === 'user' ? (
-                  <User className="w-4 h-4 text-primary" />
+                  <User className="w-4 h-4 text-[var(--a-400)]" />
                 ) : (
-                  <Bot className="w-4 h-4" />
+                  <Bot className="w-4 h-4 text-[var(--text-secondary)]" />
                 )}
               </div>
               
@@ -212,8 +212,8 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
                 <div className={cn(
                   'inline-block px-4 py-2 rounded-lg',
                   message.role === 'user' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted'
+                    ? 'bg-[var(--a-500)] text-[var(--text-inverse)]' 
+                    : 'bg-[var(--bg-hover)] text-[var(--text-secondary)]'
                 )}>
                   {message.isLoading ? (
                     <div className="flex items-center gap-2">
@@ -229,16 +229,16 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
                   <div className="flex items-center gap-1 mt-1">
                     <button
                       onClick={() => handleCopy(message.content, message.id)}
-                      className="p-1 hover:bg-muted rounded transition-colors"
+                      className="p-1 hover:bg-[var(--bg-hover)] rounded transition-colors"
                       title="Copy"
                     >
                       {copiedId === message.id ? (
-                        <Check className="w-3 h-3 text-green-500" />
+                        <Check className="w-3 h-3 text-[var(--success)]" />
                       ) : (
-                        <Copy className="w-3 h-3 text-muted-foreground" />
+                        <Copy className="w-3 h-3 text-[var(--text-muted)]" />
                       )}
                     </button>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-[var(--text-muted)]">
                       {formatTimestamp(message.timestamp)}
                     </span>
                   </div>
@@ -251,7 +251,7 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -260,7 +260,7 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Message Codex Chat..."
-              className="w-full px-4 py-3 bg-muted border border-input rounded-lg resize-none text-sm"
+              className="w-full px-4 py-3 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg resize-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)]"
               rows={1}
               style={{ minHeight: '48px', maxHeight: '120px' }}
               disabled={isLoading}
@@ -273,8 +273,8 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
             className={cn(
               'p-3 rounded-lg transition-colors',
               input.trim() && !isLoading
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
+                ? 'bg-[var(--a-500)] text-[var(--text-inverse)] hover:bg-[var(--a-400)]'
+                : 'bg-[var(--bg-hover)] text-[var(--text-muted)] cursor-not-allowed'
             )}
           >
             {isLoading ? (
@@ -285,7 +285,7 @@ For file-based coding tasks, please switch to the **Code** tab where I can acces
           </button>
         </div>
         
-        <p className="text-xs text-muted-foreground mt-2 text-center">
+        <p className="text-xs text-[var(--text-muted)] mt-2 text-center">
           Press Enter to send, Shift+Enter for new line • Chat mode has no file access
         </p>
       </div>

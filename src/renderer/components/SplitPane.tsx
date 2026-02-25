@@ -4,16 +4,24 @@ interface SplitPaneProps {
   children: [React.ReactNode, React.ReactNode];
   direction?: 'horizontal' | 'vertical';
   defaultSplit?: number;
+  defaultRatio?: number;
   minSize?: number;
+  maxSize?: number;
 }
 
 export const SplitPane: React.FC<SplitPaneProps> = ({
   children,
   direction = 'horizontal',
   defaultSplit = 50,
+  defaultRatio,
   minSize = 200,
+  maxSize,
 }) => {
-  const [split, setSplit] = useState(defaultSplit);
+  const initialSplit =
+    typeof defaultRatio === 'number'
+      ? Math.max(0, Math.min(100, defaultRatio * 100))
+      : defaultSplit;
+  const [split, setSplit] = useState(initialSplit);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleMouseDown = useCallback(() => {
@@ -39,12 +47,17 @@ export const SplitPane: React.FC<SplitPaneProps> = ({
       }
 
       // Apply min size constraints
-      const minPercent = (minSize / (direction === 'horizontal' ? rect.width : rect.height)) * 100;
-      newSplit = Math.max(minPercent, Math.min(100 - minPercent, newSplit));
+      const totalSize = direction === 'horizontal' ? rect.width : rect.height;
+      const minPercent = (minSize / totalSize) * 100;
+      let maxPercent = 100 - minPercent;
+      if (typeof maxSize === 'number' && maxSize > minSize) {
+        maxPercent = Math.min(maxPercent, (maxSize / totalSize) * 100);
+      }
+      newSplit = Math.max(minPercent, Math.min(maxPercent, newSplit));
 
       setSplit(newSplit);
     },
-    [isDragging, direction, minSize]
+    [isDragging, direction, minSize, maxSize]
   );
 
   const isHorizontal = direction === 'horizontal';
@@ -69,7 +82,7 @@ export const SplitPane: React.FC<SplitPaneProps> = ({
       <div
         className={`${
           isHorizontal ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize'
-        } bg-border hover:bg-primary transition-colors flex-shrink-0`}
+        } bg-[var(--border-subtle)] hover:bg-[var(--a-500)] transition-colors flex-shrink-0`}
         onMouseDown={handleMouseDown}
         style={{
           userSelect: 'none',
@@ -83,7 +96,7 @@ export const SplitPane: React.FC<SplitPaneProps> = ({
           <div
             className={`${
               isHorizontal ? 'w-0.5 h-4' : 'w-4 h-0.5'
-            } bg-muted-foreground/30 rounded-full`}
+            } bg-[var(--text-muted)] opacity-30 rounded-full`}
           />
         </div>
       </div>
@@ -125,21 +138,21 @@ export const MultiPaneLayout: React.FC<MultiPaneLayoutProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tab bar */}
-      <div className="flex items-center border-b border-border bg-card">
+      <div className="flex items-center border-b border-[var(--border-subtle)] bg-[var(--bg-card)]">
         {panes.map((pane) => (
           <div
             key={pane.id}
-            className={`group flex items-center gap-2 px-4 py-2 text-sm cursor-pointer border-r border-border transition-colors ${
+            className={`group flex items-center gap-2 px-4 py-2 text-sm cursor-pointer border-r border-[var(--border-subtle)] transition-colors ${
               pane.id === activePaneId
-                ? 'bg-background text-foreground border-t-2 border-t-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                ? 'bg-[var(--bg-app)] text-[var(--text-primary)] border-t-2 border-t-[var(--a-500)]'
+                : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
             }`}
             onClick={() => onPaneChange(pane.id)}
           >
             <span className="truncate max-w-[150px]">{pane.title}</span>
             {onPaneClose && panes.length > 1 && (
               <button
-                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-muted rounded"
+                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[var(--bg-hover)] rounded"
                 onClick={(e) => {
                   e.stopPropagation();
                   onPaneClose(pane.id);

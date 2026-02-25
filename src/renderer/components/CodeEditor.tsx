@@ -2,11 +2,8 @@ import React, { useRef, useCallback } from 'react';
 import Editor, { Monaco, OnMount, DiffEditor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { 
-  Maximize2, 
-  Minimize2, 
   Copy, 
   Download, 
-  Search,
   Settings,
   RefreshCw
 } from 'lucide-react';
@@ -33,7 +30,7 @@ interface CodeEditorProps {
 export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   language = 'javascript',
-  theme = 'vs-dark',
+  theme,
   readOnly = false,
   onChange,
   onSave,
@@ -49,6 +46,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
+  const effectiveTheme =
+    theme ?? (document.documentElement.getAttribute('data-theme') === 'light' ? 'vs-light' : 'vs-dark');
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
@@ -108,44 +107,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   }, []);
 
-  const getLanguageFromPath = (path: string): string => {
-    const ext = path.split('.').pop()?.toLowerCase();
-    const langMap: Record<string, string> = {
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'json': 'json',
-      'html': 'html',
-      'css': 'css',
-      'scss': 'scss',
-      'md': 'markdown',
-      'py': 'python',
-      'rs': 'rust',
-      'go': 'go',
-      'java': 'java',
-      'c': 'c',
-      'cpp': 'cpp',
-      'h': 'c',
-      'hpp': 'cpp',
-      'sql': 'sql',
-      'yaml': 'yaml',
-      'yml': 'yaml',
-      'xml': 'xml',
-      'sh': 'shell',
-      'bash': 'shell',
-      'zsh': 'shell',
-    };
-    return langMap[ext || ''] || 'plaintext';
-  };
-
   if (diffEditor && originalValue !== undefined) {
     return (
-      <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden" data-testid={dataTestid}>
-        <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex flex-col h-full border border-[var(--border-subtle)] rounded-[var(--radius-lg)] overflow-hidden" data-testid={dataTestid}>
+        <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)]">
+          <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
             <span>Diff Editor</span>
-            <span className="px-2 py-0.5 bg-secondary rounded text-xs">{language}</span>
+            <span className="px-2 py-0.5 bg-[var(--bg-hover)] border border-[var(--border-subtle)] rounded text-xs text-[var(--text-secondary)]">
+              {language}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="sm" onClick={handleCopy}>
@@ -157,7 +127,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           <DiffEditor
             height="100%"
             language={language}
-            theme={theme}
+            theme={effectiveTheme}
             original={originalValue}
             modified={value}
             options={{
@@ -177,11 +147,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden" data-testid={dataTestid}>
-      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex flex-col h-full border border-[var(--border-subtle)] rounded-[var(--radius-lg)] overflow-hidden" data-testid={dataTestid}>
+      <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <span>{language === 'typescript' ? 'TypeScript' : language === 'javascript' ? 'JavaScript' : language}</span>
-          <span className="px-2 py-0.5 bg-secondary rounded text-xs">{value.split('\n').length} lines</span>
+          <span className="px-2 py-0.5 bg-[var(--bg-hover)] border border-[var(--border-subtle)] rounded text-xs text-[var(--text-secondary)]">
+            {value.split('\n').length} lines
+          </span>
         </div>
         <div className="flex items-center gap-1">
           <Button 
@@ -215,7 +187,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           height="100%"
           language={language}
           value={value}
-          theme={theme}
+          theme={effectiveTheme}
           onChange={onChange}
           onMount={handleEditorMount}
           options={{
@@ -245,7 +217,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           }}
           loading={
             <div className="flex items-center justify-center h-full">
-              <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+              <RefreshCw className="w-6 h-6 animate-spin text-[var(--text-muted)]" />
             </div>
           }
         />

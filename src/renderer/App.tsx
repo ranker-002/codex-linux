@@ -12,7 +12,7 @@ import { AuditTrailPanel } from './components/AuditTrailPanel';
 import { WelcomeChat } from './components/WelcomeChat';
 import { I18nProvider } from './i18n/I18nProvider';
 import { Agent, Worktree, Skill, Automation, AIProvider, Settings } from '../shared/types';
-import './styles/abyss-teal.css';
+import './styles/design-system.css';
 
 function App() {
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ function App() {
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [activeTab, setActiveTab] = useState('agents');
+  const [activeTab, setActiveTab] = useState('chat');
   const [isLoading, setIsLoading] = useState(true);
   const [streamingContent, setStreamingContent] = useState<Record<string, string>>({});
 
@@ -52,6 +52,10 @@ function App() {
     }
     if (path.startsWith('/automations')) {
       setActiveTab('automations');
+      return;
+    }
+    if (path.startsWith('/audit')) {
+      setActiveTab('audit');
       return;
     }
     if (path.startsWith('/settings')) {
@@ -82,6 +86,9 @@ function App() {
       case 'automations':
         navigate('/automations');
         break;
+      case 'audit':
+        navigate('/audit');
+        break;
       case 'settings':
         navigate('/settings');
         break;
@@ -91,7 +98,45 @@ function App() {
   };
 
   useEffect(() => {
+    const resolveTheme = () => {
+      const selectedTheme = settings?.theme ?? 'dark';
+      if (selectedTheme === 'light') {
+        return 'light';
+      }
+      if (
+        selectedTheme === 'system' &&
+        window.matchMedia?.('(prefers-color-scheme: light)').matches
+      ) {
+        return 'light';
+      }
+      return 'dark';
+    };
+
+    const applyTheme = () => {
+      document.documentElement.setAttribute('data-theme', resolveTheme());
+    };
+
+    applyTheme();
+
+    if (settings?.theme !== 'system' || !window.matchMedia) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
+    const onThemeChange = () => applyTheme();
+    mediaQuery.addEventListener('change', onThemeChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', onThemeChange);
+    };
+  }, [settings?.theme]);
+
+  useEffect(() => {
     loadInitialData();
+
+    if (!window.electronAPI) {
+      return;
+    }
 
     const handleStreamChunk = ({ agentId, chunk }: { agentId: string; chunk: string }) => {
       setStreamingContent(prev => ({
@@ -143,6 +188,10 @@ function App() {
   }, []);
 
   const loadInitialData = async () => {
+    if (!window.electronAPI) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const [
         agentsData,
@@ -226,14 +275,27 @@ function App() {
   if (isLoading) {
     return (
       <div 
-        className="flex items-center justify-center h-screen bg-[var(--bg-void)]"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          background: 'var(--bg-void)'
+        }}
         data-testid="app-loading"
       >
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full border-2 border-[var(--border-default)] border-t-[var(--teal-500)] animate-spin" />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              border: '2px solid var(--border-default)',
+              borderTopColor: 'var(--teal-500)',
+              animation: 'spin 0.6s linear infinite'
+            }} />
           </div>
-          <p className="text-sm text-[var(--text-muted)] animate-pulse">Loading Codex...</p>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', animation: 'pulse 2s ease-in-out infinite' }}>Loading Codex...</p>
         </div>
       </div>
     );
@@ -242,12 +304,12 @@ function App() {
   return (
     <I18nProvider>
       <div 
-        className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
+        className="app-shell"
         data-testid="app-container"
       >
         <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
         
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="app-main">
           {activeTab !== 'chat' && (
             <Header 
               activeTab={activeTab}
@@ -257,7 +319,7 @@ function App() {
           )}
           
           <main 
-            className={`flex-1 overflow-hidden animate-fadeIn ${activeTab === 'chat' ? '' : 'bg-[var(--bg-primary)]'}`}
+            className={`app-content dot-grid-bg animate-fadeIn`}
             data-testid="main-content"
           >
             <Routes>

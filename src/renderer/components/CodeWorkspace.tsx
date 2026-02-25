@@ -3,7 +3,6 @@ import { FileExplorer } from './FileExplorer';
 import { CodeEditor } from './CodeEditor';
 import { SplitPane } from './SplitPane';
 import { X, FileCode } from 'lucide-react';
-import { Button } from './ui/Button';
 
 interface CodeWorkspaceProps {
   rootPath?: string;
@@ -107,22 +106,22 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
     <div className="flex flex-col h-full">
       {/* Tab Bar */}
       {openFiles.length > 0 && (
-        <div className="flex items-center bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] overflow-x-auto">
+        <div className="flex items-center bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] overflow-x-auto">
           {openFiles.map(file => (
             <div
               key={file}
               onClick={() => setActiveFile(file)}
-              className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer border-r border-[var(--color-border)] min-w-0 ${
+              className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer border-r border-[var(--border-subtle)] min-w-0 ${
                 activeFile === file 
-                  ? 'bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]' 
-                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
+                  ? 'bg-[var(--bg-app)] text-[var(--text-primary)]' 
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
               }`}
             >
               <FileCode className="w-4 h-4 flex-shrink-0" />
               <span className="truncate max-w-32">{getFileName(file)}</span>
               <button
                 onClick={(e) => handleCloseFile(file, e)}
-                className="ml-1 p-0.5 hover:bg-[var(--color-bg-tertiary)] rounded"
+                className="ml-1 p-0.5 hover:bg-[var(--bg-hover)] rounded"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -147,7 +146,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
             />
           </div>
           
-          <div className="h-full overflow-hidden bg-[var(--color-bg-primary)]">
+          <div className="h-full overflow-hidden bg-[var(--bg-app)]">
             {activeFile ? (
               <CodeEditor
                 value={fileContent}
@@ -158,7 +157,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
                 dataTestid="code-workspace-editor"
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-[var(--color-text-muted)]">
+              <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
                 <div className="text-center">
                   <FileCode className="w-16 h-16 mx-auto mb-4 opacity-30" />
                   <p>Select a file to edit</p>
@@ -171,7 +170,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
       </div>
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between px-3 py-1 bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]">
+      <div className="flex items-center justify-between px-3 py-1 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
         <div className="flex items-center gap-4">
           {activeFile && (
             <>
@@ -182,7 +181,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
           )}
         </div>
         <div>
-          {isLoading && <span className="text-[var(--color-accent)]">Loading...</span>}
+          {isLoading && <span className="text-[var(--a-400)]">Loading...</span>}
         </div>
       </div>
     </div>

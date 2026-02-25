@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollText, Download, Filter, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { AppPageLayout } from './layout/AppPageLayout';
 
 interface AuditEvent {
   id: string;
@@ -52,97 +53,95 @@ export const AuditTrailPanel: React.FC = () => {
   };
 
   const getActionColor = (action: string) => {
-    if (action.includes('created')) return 'bg-green-500/10 text-green-500';
-    if (action.includes('deleted')) return 'bg-red-500/10 text-red-500';
-    if (action.includes('applied') || action.includes('restored')) return 'bg-blue-500/10 text-blue-500';
-    if (action.includes('failed')) return 'bg-orange-500/10 text-orange-500';
-    return 'bg-gray-500/10 text-gray-500';
+    if (action.includes('created')) return 'bg-[rgba(60,200,120,0.1)] text-[var(--success)]';
+    if (action.includes('deleted')) return 'bg-[rgba(232,90,106,0.1)] text-[var(--error)]';
+    if (action.includes('applied') || action.includes('restored')) return 'bg-[rgba(104,144,244,0.1)] text-[var(--info)]';
+    if (action.includes('failed')) return 'bg-[rgba(232,184,74,0.1)] text-[var(--warning)]';
+    return 'bg-[var(--bg-hover)] text-[var(--text-secondary)]';
   };
 
   return (
-    <div className="h-full flex flex-col bg-card">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-background/50">
-        <div className="flex items-center gap-3">
-          <ScrollText className="w-5 h-5 text-muted-foreground" />
-          <div>
-            <h3 className="font-medium">Audit Trail</h3>
-            <p className="text-xs text-muted-foreground">Session activity log</p>
-          </div>
-        </div>
+    <AppPageLayout
+      title="Audit Trail"
+      subtitle="Session activity log"
+      actions={
         <div className="flex items-center gap-2">
           <button
             onClick={loadEvents}
             disabled={loading}
-            className="p-2 hover:bg-muted rounded-md disabled:opacity-50"
+            className="p-2 hover:bg-[var(--bg-hover)] rounded-md disabled:opacity-50 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={exportLogs}
-            className="p-2 hover:bg-muted rounded-md"
+            className="p-2 hover:bg-[var(--bg-hover)] rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             title="Export logs"
           >
             <Download className="w-4 h-4" />
           </button>
         </div>
-      </div>
+      }
+      contentClassName="p-0"
+    >
+      <div className="h-full flex flex-col bg-[var(--bg-card)]">
+        <div className="p-3 border-b border-[var(--border-subtle)]">
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter by action..."
+              className="w-full pl-9 pr-3 py-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:border-[var(--a-500)]"
+            />
+          </div>
+        </div>
 
-      <div className="p-3 border-b border-border">
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter by action..."
-            className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm"
-          />
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {filteredEvents.length === 0 ? (
+            <div className="text-center py-8 text-[var(--text-muted)]">
+              <ScrollText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No audit events</p>
+            </div>
+          ) : (
+            filteredEvents.map((event) => (
+              <div
+                key={event.id}
+                className="border border-[var(--border-subtle)] rounded-[var(--radius-lg)] overflow-hidden"
+              >
+                <button
+                  onClick={() => setExpandedId(expandedId === event.id ? null : event.id)}
+                  className="w-full px-3 py-2 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition-colors text-left"
+                >
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getActionColor(event.action)}`}>
+                    {event.action}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)] flex-1">
+                    {format(new Date(event.timestamp), 'MMM d, HH:mm:ss')}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {expandedId === event.id ? '−' : '+'}
+                  </span>
+                </button>
+
+                {expandedId === event.id && (
+                  <div className="px-3 py-2 bg-[var(--bg-elevated)] border-t border-[var(--border-subtle)]">
+                    <pre className="text-xs font-mono text-[var(--text-secondary)] overflow-x-auto">
+                      {JSON.stringify(event.details, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="px-4 py-2 border-t border-[var(--border-subtle)] text-xs text-[var(--text-muted)]">
+          Showing {filteredEvents.length} of {events.length} events
         </div>
       </div>
-
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {filteredEvents.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <ScrollText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No audit events</p>
-          </div>
-        ) : (
-          filteredEvents.map((event) => (
-            <div
-              key={event.id}
-              className="border border-border rounded-lg overflow-hidden"
-            >
-              <button
-                onClick={() => setExpandedId(expandedId === event.id ? null : event.id)}
-                className="w-full px-3 py-2 flex items-center gap-3 hover:bg-muted/50 transition-colors text-left"
-              >
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getActionColor(event.action)}`}>
-                  {event.action}
-                </span>
-                <span className="text-xs text-muted-foreground flex-1">
-                  {format(new Date(event.timestamp), 'MMM d, HH:mm:ss')}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {expandedId === event.id ? '−' : '+'}
-                </span>
-              </button>
-
-              {expandedId === event.id && (
-                <div className="px-3 py-2 bg-muted/30 border-t border-border">
-                  <pre className="text-xs font-mono text-muted-foreground overflow-x-auto">
-                    {JSON.stringify(event.details, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
-        Showing {filteredEvents.length} of {events.length} events
-      </div>
-    </div>
+    </AppPageLayout>
   );
 };

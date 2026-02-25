@@ -17,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, agents }) => {
       case 'worktrees': return 'Worktrees';
       case 'skills': return 'Skills';
       case 'automations': return 'Automations';
+      case 'audit': return 'Audit Trail';
       case 'settings': return 'Settings';
       default: return 'Codex';
     }
@@ -35,63 +36,75 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, agents }) => {
   };
 
   return (
-    <header 
-      className="h-12 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between px-5"
-      data-testid="app-header"
-    >
-      <div className="flex items-center gap-4">
-        <div>
-          <h1 
-            className="text-[18px] font-medium text-[var(--text-primary)] tracking-tight"
-            data-testid="page-title"
-            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 300 }}
-          >
-            {getTitle()}
-          </h1>
-        </div>
+    <header className="topbar" data-testid="app-header">
+      <div className="flex items-center gap-4" style={{ flex: 1 }}>
+        <h1 
+          className="topbar-title"
+          data-testid="page-title"
+        >
+          {getTitle()}
+        </h1>
         
         {activeTab === 'agents' && runningAgents > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-[rgba(60,200,120,0.1)] border border-[rgba(60,200,120,0.2)] rounded-full text-[11px] font-medium text-[var(--success)]">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--success)]"></span>
-            </span>
-            {runningAgents} running
+          <div className="badge badge-success">
+            <span className="badge-dot" />
+            <span>{runningAgents} running</span>
           </div>
         )}
 
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
-          <input
-            type="text"
-            placeholder="Search..."
-            className="pl-8 pr-3 py-1.5 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] w-56 focus:outline-none focus:border-[var(--teal-500)] transition-colors"
-            data-testid="search-input"
-          />
+        <div className="topbar-search">
+          <div style={{ position: 'relative' }}>
+            <Search 
+              style={{ 
+                position: 'absolute', 
+                left: 12, 
+                top: '50%', 
+                transform: 'translateY(-50%)',
+                width: 14,
+                height: 14,
+                color: 'var(--text-muted)'
+              }} 
+            />
+            <input
+              type="text"
+              placeholder="Search..."
+              className="input"
+              style={{ 
+                paddingLeft: 32, 
+                width: 200,
+                height: 32,
+                fontSize: 12
+              }}
+              data-testid="search-input"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="topbar-actions">
         <button
           onClick={handleMinimize}
-          className="p-2 hover:bg-[var(--bg-hover)] rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          className="topbar-btn"
           data-testid="window-minimize"
+          aria-label="Minimize"
         >
-          <Minus className="w-3.5 h-3.5" />
+          <Minus style={{ width: 14, height: 14 }} />
         </button>
         <button
           onClick={handleMaximize}
-          className="p-2 hover:bg-[var(--bg-hover)] rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          className="topbar-btn"
           data-testid="window-maximize"
+          aria-label="Maximize"
         >
-          <Square className="w-3.5 h-3.5" />
+          <Square style={{ width: 12, height: 12 }} />
         </button>
         <button
           onClick={handleClose}
-          className="p-2 hover:bg-[rgba(232,90,106,0.1)] hover:text-[var(--error)] rounded-[var(--radius-sm)] text-[var(--text-muted)] transition-colors"
+          className="topbar-btn topbar-btn-close"
           data-testid="window-close"
+          aria-label="Close"
         >
-          <X className="w-3.5 h-3.5" />
+          <X style={{ width: 14, height: 14 }} />
         </button>
       </div>
     </header>

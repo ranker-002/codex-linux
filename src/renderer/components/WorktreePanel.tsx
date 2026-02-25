@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Worktree } from '../../shared/types';
 import { GitBranch, Plus, Folder, Trash2, GitMerge } from 'lucide-react';
+import { AppPageLayout } from './layout/AppPageLayout';
 
 interface WorktreePanelProps {
   worktrees: Worktree[];
@@ -28,32 +29,25 @@ export const WorktreePanel: React.FC<WorktreePanelProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
-        <div>
-          <h2 
-            className="text-[18px] font-medium text-[var(--text-primary)]"
-            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 300 }}
+    <>
+      <AppPageLayout
+        title="Worktrees"
+        subtitle="Isolated workspaces for agents"
+        actions={
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn btn-primary"
           >
-            Worktrees
-          </h2>
-          <p className="text-[12px] text-[var(--text-muted)]">Isolated workspaces for agents</p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-sm)] hover:bg-[var(--teal-400)] text-[13px] font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Worktree
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-auto p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Plus className="w-4 h-4" />
+            New Worktree
+          </button>
+        }
+      >
+        <div className="page-layout-grid">
           {worktrees.map(worktree => (
             <div
               key={worktree.name}
-              className="p-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] hover:border-[var(--border-accent)] hover:translate-y-[-2px] transition-all"
+              className="col-span-12 md:col-span-6 xl:col-span-4 p-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] hover:border-[var(--a-border)] hover:translate-y-[-2px] transition-all"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -76,15 +70,15 @@ export const WorktreePanel: React.FC<WorktreePanelProps> = ({
                   <GitBranch className="w-4 h-4" />
                   <span>{worktree.branch}</span>
                 </div>
-                <div className="text-[11px] font-[var(--font-mono)] text-[var(--teal-300)] truncate">
+                <div className="text-[11px] font-[var(--font-mono)] text-[var(--text-secondary)] truncate">
                   {worktree.commit?.slice(0, 8)}
                 </div>
               </div>
 
               {!worktree.isMain && (
                 <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border-faint)]">
-                  <button className="flex-1 px-3 py-1.5 text-[12px] bg-[var(--bg-hover)] rounded-[var(--radius-sm)] hover:bg-[var(--bg-active)] text-[var(--text-secondary)] transition-colors">
-                    <GitMerge className="w-4 h-4 inline mr-1" />
+                  <button className="btn btn-secondary btn-sm flex-1">
+                    <GitMerge className="w-4 h-4" />
                     Merge
                   </button>
                   <button className="p-1.5 text-[var(--error)] hover:bg-[rgba(232,90,106,0.1)] rounded-[var(--radius-sm)] transition-colors">
@@ -96,14 +90,14 @@ export const WorktreePanel: React.FC<WorktreePanelProps> = ({
           ))}
 
           {worktrees.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
+            <div className="col-span-12 flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
               <GitBranch className="w-16 h-16 mb-4 opacity-30" />
               <p className="text-[15px] font-medium text-[var(--text-primary)]">No worktrees yet</p>
               <p className="text-[12px]">Create a worktree to isolate agent changes</p>
             </div>
           )}
         </div>
-      </div>
+      </AppPageLayout>
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-[rgba(3,7,9,0.8)] flex items-center justify-center z-50">
@@ -163,6 +157,6 @@ export const WorktreePanel: React.FC<WorktreePanelProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };

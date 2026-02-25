@@ -1,6 +1,6 @@
 {
   "name": "codex-linux",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A Linux port of OpenAI Codex - Multi-agent AI coding command center",
   "main": "dist/main/main.js",
   "author": "Codex Linux Team",

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Automation, Agent, Skill } from '../../shared/types';
 import { Clock, Plus, Play, Pause, Trash2, Calendar, Zap } from 'lucide-react';
+import { AppPageLayout } from './layout/AppPageLayout';
 
 interface AutomationPanelProps {
   automations: Automation[];
@@ -16,7 +17,13 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
   onCreateAutomation
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newAutomation, setNewAutomation] = useState({
+  const [newAutomation, setNewAutomation] = useState<{
+    name: string;
+    description: string;
+    triggerType: 'schedule' | 'event' | 'webhook' | 'manual';
+    triggerConfig: { cron?: string };
+    actions: any[];
+  }>({
     name: '',
     description: '',
     triggerType: 'schedule' as const,
@@ -49,32 +56,25 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
-        <div>
-          <h2 
-            className="text-[18px] font-medium text-[var(--text-primary)]"
-            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 300 }}
+    <>
+      <AppPageLayout
+        title="Automations"
+        subtitle="Schedule and automate agent tasks"
+        actions={
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn btn-primary"
           >
-            Automations
-          </h2>
-          <p className="text-[12px] text-[var(--text-muted)]">Schedule and automate agent tasks</p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-sm)] hover:bg-[var(--teal-400)] text-[13px] font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Automation
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Plus className="w-4 h-4" />
+            New Automation
+          </button>
+        }
+      >
+        <div className="page-layout-grid">
           {automations.map(automation => (
             <div
               key={automation.id}
-              className="p-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] hover:border-[var(--border-accent)] transition-colors"
+              className="col-span-12 md:col-span-6 p-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] hover:border-[var(--a-border)] transition-colors"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -128,14 +128,14 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
           ))}
 
           {automations.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
+            <div className="col-span-12 flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
               <Clock className="w-16 h-16 mb-4 opacity-30" />
               <p className="text-[15px] font-medium text-[var(--text-primary)]">No automations yet</p>
               <p className="text-[12px]">Create an automation to schedule agent tasks</p>
             </div>
           )}
         </div>
-      </div>
+      </AppPageLayout>
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-[rgba(3,7,9,0.8)] flex items-center justify-center z-50">
@@ -187,7 +187,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                   <label className="block text-[11px] font-medium mb-1 text-[var(--text-secondary)]">Cron Expression</label>
                   <input
                     type="text"
-                    value={newAutomation.triggerConfig.cron}
+                    value={newAutomation.triggerConfig.cron || ''}
                     onChange={e => setNewAutomation({
                       ...newAutomation,
                       triggerConfig: { cron: e.target.value }
@@ -220,6 +220,6 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };

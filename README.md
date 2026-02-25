@@ -40,13 +40,13 @@ Download the latest AppImage from [GitHub Releases](https://github.com/ranker-00
 
 ```bash
 # Download
-wget https://github.com/ranker-002/codex-linux/releases/latest/download/Codex.Linux-1.0.1.AppImage
+curl -L -o Codex.Linux-1.0.4.AppImage https://github.com/ranker-002/codex-linux/releases/latest/download/Codex.Linux-1.0.4.AppImage
 
 # Make executable
-chmod +x Codex.Linux-1.0.1.AppImage
+chmod +x Codex.Linux-1.0.4.AppImage
 
 # Run
-./Codex.Linux-1.0.1.AppImage
+./Codex.Linux-1.0.4.AppImage
 ```
 
 ### From Source

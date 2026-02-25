@@ -25,12 +25,12 @@ function cn(...inputs: (string | undefined | null | boolean)[]): string {
 const FileIcon = ({ type, isOpen }: { type: 'file' | 'folder'; isOpen: boolean }) => {
   if (type === 'folder') {
     return isOpen ? (
-      <FolderOpen className="w-4 h-4 text-yellow-500" />
+      <FolderOpen className="w-4 h-4 text-[var(--warning)]" />
     ) : (
-      <FolderOpen className="w-4 h-4 text-yellow-500" />
+      <FolderOpen className="w-4 h-4 text-[var(--warning)]" />
     );
   }
-  return <File className="w-4 h-4 text-muted-foreground" />;
+  return <File className="w-4 h-4 text-[var(--text-muted)]" />;
 };
 
 export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
@@ -105,8 +105,8 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
         <div
           className={cn(
             'flex items-center gap-1 px-2 py-1 cursor-pointer rounded-md transition-colors group',
-            isSelected && 'bg-primary/10 text-primary',
-            !isSelected && 'hover:bg-muted'
+            isSelected && 'bg-[var(--a-bg-xs)] text-[var(--a-400)]',
+            !isSelected && 'hover:bg-[var(--bg-hover)]'
           )}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={() => {
@@ -119,7 +119,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
           onContextMenu={(e) => handleContextMenu(e, item.path)}
         >
           {isFolder ? (
-            <button className="p-0.5 hover:bg-muted rounded">
+            <button className="p-0.5 hover:bg-[var(--bg-hover)] rounded">
               {isExpanded ? (
                 <ChevronDown className="w-3 h-3" />
               ) : (
@@ -142,7 +142,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
                 if (e.key === 'Enter') handleRename(item.path);
                 if (e.key === 'Escape') setEditingFile(null);
               }}
-              className="flex-1 px-1 py-0.5 text-sm bg-background border border-input rounded"
+              className="flex-1 px-1 py-0.5 text-sm bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded"
               autoFocus
               onClick={(e) => e.stopPropagation()}
             />
@@ -156,7 +156,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
               setContextMenu(null);
               setShowNewFileInput(item.path);
             }}
-            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-opacity"
+            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--bg-hover)] rounded transition-opacity"
           >
             <Plus className="w-3 h-3" />
           </button>
@@ -174,23 +174,23 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
   const filteredFiles = filterFiles(files, searchQuery);
 
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col h-full bg-[var(--bg-card)]">
       {/* Header */}
-      <div className="px-3 py-2 border-b border-border">
+      <div className="px-3 py-2 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2 mb-2">
-          <FileCode className="w-4 h-4" />
-          <span className="text-sm font-medium">Files</span>
+          <FileCode className="w-4 h-4 text-[var(--text-muted)]" />
+          <span className="text-sm font-medium text-[var(--text-primary)]">Files</span>
         </div>
         
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search files..."
-            className="w-full pl-8 pr-3 py-1.5 bg-muted border-0 rounded-md text-xs"
+            className="w-full pl-8 pr-3 py-1.5 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder:text-[var(--text-disabled)]"
           />
         </div>
       </div>
@@ -198,7 +198,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
       {/* File Tree */}
       <div className="flex-1 overflow-auto p-2">
         {filteredFiles.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-[var(--text-muted)]">
             <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No files</p>
           </div>
@@ -221,12 +221,12 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
                 }}
                 onBlur={() => handleCreateFile(showNewFileInput)}
                 placeholder={newFileType === 'file' ? 'filename.ext' : 'folder name'}
-                className="flex-1 px-2 py-1 text-sm bg-background border border-input rounded"
+                className="flex-1 px-2 py-1 text-sm bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded"
                 autoFocus
               />
               <button
                 onClick={() => setNewFileType(newFileType === 'file' ? 'folder' : 'file')}
-                className="p-1 hover:bg-muted rounded text-xs"
+                className="p-1 hover:bg-[var(--bg-hover)] rounded text-xs"
               >
                 {newFileType === 'file' ? 'Folder' : 'File'}
               </button>
@@ -236,13 +236,13 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
       </div>
 
       {/* Root actions */}
-      <div className="px-3 py-2 border-t border-border flex gap-2">
+      <div className="px-3 py-2 border-t border-[var(--border-subtle)] flex gap-2">
         <button
           onClick={() => {
             setShowNewFileInput('');
             setNewFileType('file');
           }}
-          className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-muted rounded transition-colors"
+          className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-[var(--bg-hover)] rounded transition-colors text-[var(--text-secondary)]"
         >
           <Plus className="w-3 h-3" />
           New File
@@ -252,7 +252,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
             setShowNewFileInput('');
             setNewFileType('folder');
           }}
-          className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-muted rounded transition-colors"
+          className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-[var(--bg-hover)] rounded transition-colors text-[var(--text-secondary)]"
         >
           <Plus className="w-3 h-3" />
           New Folder
@@ -267,7 +267,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
             onClick={() => setContextMenu(null)}
           />
           <div
-            className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[140px]"
+            className="fixed z-50 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-md shadow-lg py-1 min-w-[140px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             <button
@@ -279,7 +279,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
                 }
                 setContextMenu(null);
               }}
-              className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
+              className="w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--bg-hover)] flex items-center gap-2 text-[var(--text-secondary)]"
             >
               Rename
             </button>
@@ -288,7 +288,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
                 onFileDelete(contextMenu.path);
                 setContextMenu(null);
               }}
-              className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2 text-red-500"
+              className="w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--bg-hover)] flex items-center gap-2 text-[var(--error)]"
             >
               Delete
             </button>
