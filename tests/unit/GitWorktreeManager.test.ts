@@ -98,13 +98,13 @@ describe('GitWorktreeManager', () => {
 
   describe('removeWorktree', () => {
     it('should remove worktree and delete branch', async () => {
-      await manager.removeWorktree('/repo', 'test-worktree');
+      await manager.removeWorktree('/repo/.codex/worktrees/test-worktree');
 
       expect(mockGit.raw).toHaveBeenCalledWith([
         'worktree',
         'remove',
         '--force',
-        expect.stringContaining('test-worktree'),
+        '/repo/.codex/worktrees/test-worktree',
       ]);
       expect(mockGit.deleteLocalBranch).toHaveBeenCalledWith(
         'codex/test-worktree',

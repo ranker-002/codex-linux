@@ -127,12 +127,45 @@ export class AgentTools {
     }
   }
 
+  private parseCommandLine(command: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+    
+    for (let i = 0; i < command.length; i++) {
+      const char = command[i];
+      if ((char === '"' || char === "'") && !inQuote) {
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === quoteChar && inQuote) {
+        inQuote = false;
+        quoteChar = '';
+      } else if (char === ' ' && !inQuote) {
+        if (current) {
+          args.push(current);
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    }
+    if (current) args.push(current);
+    return args;
+  }
+
   async bash(params: BashToolParams): Promise<ToolResult> {
     return new Promise((resolve) => {
       const cwd = params.cwd ? this.resolvePath(params.cwd) : this.worktreePath;
       const timeout = params.timeout || 120000;
       
-      const [cmd, ...args] = params.command.split(' ');
+      const parsedArgs = this.parseCommandLine(params.command);
+      if (parsedArgs.length === 0) {
+        return resolve({ success: false, output: '', error: 'Empty command' });
+      }
+
+      const cmd = parsedArgs[0];
+      const args = parsedArgs.slice(1);
       
       const child = spawn(cmd, args, {
         cwd,

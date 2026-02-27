@@ -7,6 +7,8 @@ import {
   GitBranch,
   ImagePlus,
   Sparkles,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 
 interface WelcomeChatProps {
@@ -14,25 +16,52 @@ interface WelcomeChatProps {
   providers: AIProvider[];
   skills: Skill[];
   onCreateAgent: (config: any) => Promise<Agent>;
+  onAgentCreated?: (agent: Agent, message?: string) => void;
 }
 
 const FREE_MODELS = [
   { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', providerId: 'free' },
   { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1', providerId: 'free' },
+  { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', providerId: 'free' },
   { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', providerId: 'free' },
+  { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder', providerId: 'free' },
+  { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B', providerId: 'free' },
+  { id: 'z-ai/glm-4.5-air:free', name: 'GLM 4.5 Air', providerId: 'free' },
+  { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Groq)', providerId: 'free' },
+  { id: 'llama3.2:latest', name: 'Llama 3.2 (Ollama)', providerId: 'free' },
+  { id: 'llama3.3:latest', name: 'Llama 3.3 70B (Ollama)', providerId: 'free' },
+  { id: 'mistral:latest', name: 'Mistral 7B (Ollama)', providerId: 'free' },
+  { id: 'deepseek-r1:latest', name: 'DeepSeek R1 (Ollama)', providerId: 'free' },
+  { id: 'qwen2.5:latest', name: 'Qwen 2.5 (Ollama)', providerId: 'free' },
+  { id: 'codellama:latest', name: 'Code Llama (Ollama)', providerId: 'free' },
 ];
+
+const getFreeModels = (providers: AIProvider[]) => {
+  const freeProvider = providers.find(p => p.id === 'free-models');
+  if (freeProvider && freeProvider.models.length > 0) {
+    return freeProvider.models.map(m => ({ id: m.id, name: m.name, providerId: 'free' }));
+  }
+  return FREE_MODELS;
+};
 
 export const WelcomeChat: React.FC<WelcomeChatProps> = ({
   agents,
   providers,
   skills,
   onCreateAgent,
+  onAgentCreated,
 }) => {
   const [input, setInput] = useState('');
-  const [workspacePath, setWorkspacePath] = useState(process.cwd());
+  const [workspacePath, setWorkspacePath] = useState('');
   const [selectedRuntime, setSelectedRuntime] = useState('local');
-  const [selectedModel, setSelectedModel] = useState(FREE_MODELS[0].id);
+  const [showRuntimeDropdown, setShowRuntimeDropdown] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const runtimeDropdownRef = useRef<HTMLDivElement>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  const freeModels = useMemo(() => getFreeModels(providers), [providers]);
+  const [selectedModel, setSelectedModel] = useState(freeModels[0]?.id || '');
 
   const runtimeOptions = useMemo(() => {
     const base = [{ id: 'local', label: 'Local' }];
@@ -47,6 +76,10 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
   ];
 
   const openFolderPicker = async () => {
+    if (!window.electronAPI) {
+      console.warn('Electron API not available');
+      return;
+    }
     try {
       const path = await window.electronAPI.dialog.selectFolder();
       if (path) {
@@ -62,7 +95,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
 
     try {
       const runtimeProvider = runtimeOptions.find((runtime) => runtime.id === selectedRuntime);
-      const modelConfig = FREE_MODELS.find((model) => model.id === selectedModel) || FREE_MODELS[0];
+      const modelConfig = freeModels.find((model) => model.id === selectedModel) || freeModels[0];
       const providerId = runtimeProvider?.id === 'local' ? modelConfig.providerId : runtimeProvider?.id;
 
       const newAgent = await onCreateAgent({
@@ -73,7 +106,11 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
         skills: [],
       });
 
-      await window.electronAPI.agent.sendMessage(newAgent.id, input.trim());
+      if (onAgentCreated) {
+        onAgentCreated(newAgent, input.trim());
+      } else if (window.electronAPI) {
+        await window.electronAPI.agent.sendMessage(newAgent.id, input.trim());
+      }
       setInput('');
       inputRef.current?.focus();
     } catch (error) {
@@ -114,21 +151,29 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
             <span className="welcome-select-caret">⌄</span>
           </button>
 
-          <div className="welcome-runtime-select">
+          <div className="welcome-runtime-select" ref={runtimeDropdownRef}>
             <Monitor className="welcome-select-icon" />
-            <select
-              value={selectedRuntime}
-              onChange={(e) => setSelectedRuntime(e.target.value)}
-              className="welcome-runtime-native"
-              data-testid="welcome-runtime"
+            <button
+              onClick={() => setShowRuntimeDropdown(!showRuntimeDropdown)}
+              className="welcome-runtime-button"
             >
-              {runtimeOptions.map((runtime) => (
-                <option key={runtime.id} value={runtime.id}>
-                  {runtime.label}
-                </option>
-              ))}
-            </select>
-            <span className="welcome-select-caret">⌄</span>
+              <span>{runtimeOptions.find(r => r.id === selectedRuntime)?.label || 'Select'}</span>
+              <ChevronDown className={`w-3 h-3 ${showRuntimeDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            {showRuntimeDropdown && (
+              <div className="welcome-dropdown">
+                {runtimeOptions.map((runtime) => (
+                  <button
+                    key={runtime.id}
+                    onClick={() => { setSelectedRuntime(runtime.id); setShowRuntimeDropdown(false); }}
+                    className={`welcome-dropdown-item ${selectedRuntime === runtime.id ? 'active' : ''}`}
+                  >
+                    <span>{runtime.label}</span>
+                    {selectedRuntime === runtime.id && <Check className="w-3 h-3" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -160,17 +205,30 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
                 </div>
 
                 <div className="welcome-composer-actions">
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="welcome-model-select"
-                  >
-                    {FREE_MODELS.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative" ref={modelDropdownRef}>
+                    <button
+                      onClick={() => setShowModelDropdown(!showModelDropdown)}
+                      className="welcome-model-button"
+                    >
+                      <Sparkles className="w-3 h-3 text-[var(--a-400)]" />
+                      <span>{freeModels.find(m => m.id === selectedModel)?.name || 'Select Model'}</span>
+                      <ChevronDown className={`w-3 h-3 ${showModelDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showModelDropdown && (
+                      <div className="welcome-dropdown">
+                        {freeModels.map((model) => (
+                          <button
+                            key={model.id}
+                            onClick={() => { setSelectedModel(model.id); setShowModelDropdown(false); }}
+                            className={`welcome-dropdown-item ${selectedModel === model.id ? 'active' : ''}`}
+                          >
+                            <span>{model.name}</span>
+                            {selectedModel === model.id && <Check className="w-3 h-3" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() => void handleSend()}
                     disabled={!input.trim()}
@@ -205,32 +263,10 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
               <p className="welcome-warning-copy">
                 <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <span>
-                  Claude Code may read, write, or execute files in this folder. This can pose security
-                  risks, so only use Claude Code in trusted repositories.
+                  Codlux may read, write, or execute files in this folder. This can pose security
+                  risks, so only use Codlux in trusted repositories.
                 </span>
               </p>
-            </div>
-          </div>
-
-          <div className="welcome-right">
-            <div className="welcome-preview">
-              <span className="welcome-preview-chip">
-                <Monitor className="w-3.5 h-3.5" />
-                Preview
-              </span>
-              <div className="welcome-preview-card">
-                <h3>Welcome to Claude Code!</h3>
-                <p>Your coding partner that works directly in your codebase.</p>
-
-                <div className="welcome-preview-log">
-                  <div>• Task: Find clawed component</div>
-                  <div>• Grep: <code>claw</code></div>
-                  <div>• Read: <code>./components/ClawedCharacter.tsx</code></div>
-                  <div>• Edit: keyframes block</div>
-                </div>
-
-                <button className="btn btn-secondary btn-sm">Install runtime dependencies</button>
-              </div>
             </div>
           </div>
         </div>

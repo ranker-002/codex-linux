@@ -6,11 +6,13 @@ import { AppPageLayout } from './layout/AppPageLayout';
 interface WorktreePanelProps {
   worktrees: Worktree[];
   onCreateWorktree: (repoPath: string, name: string) => Promise<Worktree>;
+  onDeleteWorktree?: (worktreePath: string) => void;
 }
 
 export const WorktreePanel: React.FC<WorktreePanelProps> = ({
   worktrees,
-  onCreateWorktree
+  onCreateWorktree,
+  onDeleteWorktree
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newWorktreeConfig, setNewWorktreeConfig] = useState({
@@ -81,7 +83,10 @@ export const WorktreePanel: React.FC<WorktreePanelProps> = ({
                     <GitMerge className="w-4 h-4" />
                     Merge
                   </button>
-                  <button className="p-1.5 text-[var(--error)] hover:bg-[rgba(232,90,106,0.1)] rounded-[var(--radius-sm)] transition-colors">
+                  <button 
+                    className="p-1.5 text-[var(--error)] hover:bg-[rgba(232,90,106,0.1)] rounded-[var(--radius-sm)] transition-colors"
+                    onClick={() => onDeleteWorktree?.(worktree.path)}
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

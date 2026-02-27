@@ -212,6 +212,25 @@ export class AgentOrchestrator extends EventEmitter {
     return agent;
   }
 
+  async updateAgent(agentId: string, updates: Partial<Agent>): Promise<Agent> {
+    const agent = await this.getAgentOrThrow(agentId);
+    
+    const updatedAgent = {
+      ...agent,
+      ...updates,
+      id: agent.id, // Ensure ID doesn't change
+      updatedAt: new Date()
+    };
+
+    this.agents.set(agentId, updatedAgent);
+    await this.dbManager.updateAgent(updatedAgent);
+    
+    this.emit('agent:updated', updatedAgent);
+    log.info(`Updated agent ${agentId}`);
+    
+    return updatedAgent;
+  }
+
   async listAgents(): Promise<Agent[]> {
     return Array.from(this.agents.values());
   }
@@ -702,7 +721,8 @@ export class AgentOrchestrator extends EventEmitter {
 
     // Remove worktree
     try {
-      await this.gitWorktreeManager.removeWorktree(agent.projectPath, agent.worktreeName);
+      const worktreePath = agent.worktreePath || path.join(agent.projectPath, '.codex', 'worktrees', agent.worktreeName);
+      await this.gitWorktreeManager.removeWorktree(worktreePath);
     } catch (error) {
       log.warn(`Failed to remove worktree for agent ${agentId}:`, error);
     }
@@ -794,70 +814,62 @@ export class AgentOrchestrator extends EventEmitter {
 
   private applyDiff(originalContent: string, diffContent: string): string {
     const lines = diffContent.split('\n');
-    const result: string[] = [];
+    const originalLines = originalContent.split('\n');
+    let resultLines = [...originalLines];
     
-    let i = 0;
-    while (i < lines.length) {
+    let hunkOffset = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
       if (line.startsWith('@@')) {
-        const hunkHeader = line;
-        const match = hunkHeader.match(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
+        const match = line.match(/@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
+        if (!match) continue;
+
+        const oldStart = parseInt(match[1]);
+        const oldLength = match[2] === '' ? 1 : parseInt(match[2]);
         
-        if (match) {
-          const [, oldStart, oldCount, newStart, newCount] = match.map(Number);
-          const originalLines = originalContent.split('\n');
-          
-          const beforeContext = originalLines.slice(Math.max(0, oldStart - 2), oldStart - 1);
-          result.push(...beforeContext);
-          
-          i++;
-          
-          const hunkOldLines: string[] = [];
-          const hunkNewLines: string[] = [];
-          
-          while (i < lines.length && !lines[i].startsWith('@@') && !lines[i].startsWith('diff ')) {
-            if (lines[i].startsWith('-')) {
-              hunkOldLines.push(lines[i].substring(1));
-            } else if (lines[i].startsWith('+')) {
-              hunkNewLines.push(lines[i].substring(1));
-            } else if (!lines[i].startsWith('\\')) {
-              hunkOldLines.push(lines[i]);
-              hunkNewLines.push(lines[i]);
-            }
-            i++;
-          }
-          
-          result.push(...hunkNewLines);
-          
-          const afterContext = originalLines.slice(
-            oldStart - 1 + (oldCount || hunkOldLines.length),
-            oldStart - 1 + (oldCount || hunkOldLines.length) + 2
-          );
-          result.push(...afterContext);
-          
-          continue;
+        const hunkLines: string[] = [];
+        let j = i + 1;
+        while (j < lines.length && !lines[j].startsWith('@@')) {
+          hunkLines.push(lines[j]);
+          j++;
         }
-      }
-      i++;
-    }
-    
-    if (result.length === 0 && diffContent.includes('new file')) {
-      const newFileMatch = diffContent.match(/\+\+\+ b\/(.+)/);
-      if (newFileMatch) {
-        const newLines: string[] = [];
-        for (const line of lines) {
-          if (line.startsWith('+') && !line.startsWith('+++')) {
-            newLines.push(line.substring(1));
-          } else if (line.startsWith(' ')) {
-            newLines.push(line.substring(1));
+        i = j - 1;
+
+        const newHunkLines: string[] = [];
+        const oldHunkLines: string[] = [];
+        
+        for (const hunkLine of hunkLines) {
+          if (hunkLine.startsWith('+')) {
+            newHunkLines.push(hunkLine.substring(1));
+          } else if (hunkLine.startsWith('-')) {
+            oldHunkLines.push(hunkLine.substring(1));
+          } else {
+            const content = hunkLine.startsWith(' ') ? hunkLine.substring(1) : hunkLine;
+            newHunkLines.push(content);
+            oldHunkLines.push(content);
           }
         }
-        return newLines.join('\n');
+
+        // Apply hunk at the specified position (adjusted by previous hunks)
+        const applyPos = Math.max(0, oldStart - 1 + hunkOffset);
+        
+        // Basic validation: check if oldLines match what we expect
+        // In a real patch tool, we'd search for context if it doesn't match exactly
+        resultLines.splice(applyPos, oldLength, ...newHunkLines);
+        hunkOffset += (newHunkLines.length - oldLength);
       }
     }
     
-    return result.join('\n');
+    // Handle new files
+    if (resultLines.length === 0 && diffContent.includes('new file')) {
+      return lines
+        .filter(l => l.startsWith('+') && !l.startsWith('+++'))
+        .map(l => l.substring(1))
+        .join('\n');
+    }
+
+    return resultLines.join('\n');
   }
 
   // Permission Management

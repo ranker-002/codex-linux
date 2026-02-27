@@ -1,4 +1,15 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Notification, Tray, Menu, globalShortcut, nativeImage } from 'electron';
+
+// Disable hardware acceleration to prevent SIGSEGV on systems with incompatible drivers
+// This must be called as early as possible
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-rasterization');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('no-sandbox');
+
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { spawn, ChildProcess } from 'child_process';
@@ -64,6 +75,32 @@ let smartCodeAssistant: SmartCodeAssistant;
 log.info('Starting Codex Linux...');
 
 function createWindow(): void {
+  const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
+  let preloadPath = path.join(__dirname, 'preload.js');
+  
+  // Try to find the preload script in multiple likely locations
+  const possiblePaths = [
+    preloadPath,
+    path.join(process.cwd(), 'dist/main/preload.js'),
+    path.join(app.getAppPath(), 'dist/main/preload.js'),
+    path.join(__dirname, 'main/preload.js')
+  ];
+
+  const fs = require('fs');
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      preloadPath = p;
+      log.info(`[SUCCESS] Found preload script at: ${p}`);
+      break;
+    } else {
+      log.warn(`[CHECK] Preload not found at: ${p}`);
+    }
+  }
+
+  if (!fs.existsSync(preloadPath)) {
+    log.error(`[CRITICAL] Preload script NOT FOUND anywhere! Defaulted to: ${preloadPath}`);
+  }
+  
   mainWindow = new BrowserWindow({
     width: 1600,
     height: 1000,
@@ -73,8 +110,9 @@ function createWindow(): void {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-      sandbox: false
+      preload: preloadPath,
+      sandbox: false,
+      webSecurity: true 
     },
     show: false,
     icon: path.join(__dirname, '../../assets/icon.png')
@@ -250,6 +288,18 @@ async function initializeServices(): Promise<void> {
     await agentOrchestrator.initialize();
     log.info('Agent orchestrator initialized');
 
+    agentOrchestrator.on('agent:created', (agent: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:created', agent);
+      }
+    });
+
+    agentOrchestrator.on('agent:message', (payload: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('agent:message', payload);
+      }
+    });
+
     agentOrchestrator.on('changes:created', (payload: { agentId: string; changeId: string }) => {
       if (mainWindow) {
         mainWindow.webContents.send('changes:created', payload);
@@ -314,12 +364,13 @@ async function initializeServices(): Promise<void> {
     // Initialize AI pair programming
     aiPairProgramming = new AIPairProgramming(
       agentOrchestrator,
-      aiProviderManager
+      aiProviderManager,
+      settingsManager
     );
     log.info('AI pair programming initialized');
 
     // Initialize smart code assistant
-    smartCodeAssistant = new SmartCodeAssistant(aiProviderManager);
+    smartCodeAssistant = new SmartCodeAssistant(aiProviderManager, settingsManager);
     log.info('Smart code assistant initialized');
 
     // Initialize MCP manager
@@ -597,6 +648,17 @@ function setupIPC(): void {
     return await agentOrchestrator.getAgent(agentId);
   });
 
+  ipcMain.handle('agent:update', async (event, agentId: string, updates: any) => {
+    try {
+      const result = await agentOrchestrator.updateAgent(agentId, updates);
+      await auditLogger.log('agent_updated', { agentId });
+      return result;
+    } catch (error) {
+      log.error('Failed to update agent:', error);
+      throw error;
+    }
+  });
+
   ipcMain.handle('agent:sendMessage', async (event, agentId: string, message: string) => {
     try {
       return await agentOrchestrator.sendMessage(agentId, message);
@@ -663,8 +725,8 @@ function setupIPC(): void {
     return await gitWorktreeManager.listWorktrees(repoPath);
   });
 
-  ipcMain.handle('worktree:remove', async (event, repoPath: string, name: string) => {
-    return await gitWorktreeManager.removeWorktree(repoPath, name);
+  ipcMain.handle('worktree:remove', async (event, worktreePath: string) => {
+    return await gitWorktreeManager.removeWorktree(worktreePath);
   });
 
   // Skills operations

@@ -14,12 +14,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   providers,
   onSettingsChange
 }) => {
-  const [localSettings, setLocalSettings] = useState(settings);
+  const [localSettings, setLocalSettings] = useState(settings || {});
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState('general');
-  const [selectedModel, setSelectedModel] = useState<string>(localSettings.defaultModel);
+  const [selectedModel, setSelectedModel] = useState<string>(settings?.defaultModel || '');
 
   const handleSave = async () => {
+    if (!window.electronAPI) {
+      alert('Electron API not available. Please run with "npm run dev"');
+      return;
+    }
     for (const [key, value] of Object.entries(localSettings)) {
       await window.electronAPI.settings.set(key, value);
     }

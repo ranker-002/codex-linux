@@ -5,8 +5,10 @@ import log from 'electron-log';
 import { Skill, SkillFile, SkillConfig, SkillParameter } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 
-const DEFAULT_SKILLS_DIR = path.join(__dirname, '../../assets/skills');
-const USER_SKILLS_DIR = path.join(process.env.HOME || '~', '.config', 'codex', 'skills');
+import { app } from 'electron';
+
+const DEFAULT_SKILLS_DIR = path.join(process.cwd(), 'assets', 'skills');
+const USER_SKILLS_DIR = path.join(app.getPath('userData'), 'skills');
 
 export class SkillsManager {
   private skills: Map<string, Skill> = new Map();

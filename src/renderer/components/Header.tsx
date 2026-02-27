@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, agents }) => {
       case 'automations': return 'Automations';
       case 'audit': return 'Audit Trail';
       case 'settings': return 'Settings';
-      default: return 'Codex';
+      default: return 'Codlux';
     }
   };
 

@@ -10,9 +10,17 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { CodeWorkspace } from './components/CodeWorkspace';
 import { AuditTrailPanel } from './components/AuditTrailPanel';
 import { WelcomeChat } from './components/WelcomeChat';
+import { ChatInterface } from './components/ChatInterface';
 import { I18nProvider } from './i18n/I18nProvider';
 import { Agent, Worktree, Skill, Automation, AIProvider, Settings } from '../shared/types';
 import './styles/design-system.css';
+import { ElectronAPI } from './types.d';
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}
 
 function App() {
   const navigate = useNavigate();
@@ -27,6 +35,10 @@ function App() {
   const [activeTab, setActiveTab] = useState('chat');
   const [isLoading, setIsLoading] = useState(true);
   const [streamingContent, setStreamingContent] = useState<Record<string, string>>({});
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(220);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const path = location.pathname;
@@ -97,6 +109,46 @@ function App() {
     }
   };
 
+  const handleSelectAgent = (agent: Agent, messageToSend?: string) => {
+    console.log('[DEBUG] handleSelectAgent called:', agent.id, messageToSend);
+    setSelectedAgent(agent);
+    setActiveTab('chat');
+    navigate('/');
+    if (messageToSend) {
+      console.log('[DEBUG] Setting pendingMessage:', messageToSend);
+      setPendingMessage(messageToSend);
+    }
+  };
+
+  const handleSendMessage = async (message: string) => {
+    console.log('[DEBUG] handleSendMessage called:', message);
+    console.log('[DEBUG] selectedAgent:', selectedAgent);
+    if (!selectedAgent) {
+      console.log('[DEBUG] No selectedAgent, returning');
+      return;
+    }
+    
+    console.log('[DEBUG] Calling backend sendMessage');
+    try {
+      await window.electronAPI.agent.sendMessage(selectedAgent.id, message);
+      console.log('[DEBUG] sendMessage completed');
+    } catch (error) {
+      console.error('[DEBUG] sendMessage error:', error);
+    }
+  };
+
+  const handleExecuteTask = async (task: string) => {
+    if (!selectedAgent) return;
+    await window.electronAPI.agent.executeTask(selectedAgent.id, task);
+  };
+
+  const handleModelChange = async (modelId: string) => {
+    if (!selectedAgent) return;
+    await window.electronAPI.agent.update(selectedAgent.id, { model: modelId });
+    setSelectedAgent({ ...selectedAgent, model: modelId });
+    setAgents(prev => prev.map(a => a.id === selectedAgent.id ? { ...a, model: modelId } : a));
+  };
+
   useEffect(() => {
     const resolveTheme = () => {
       const selectedTheme = settings?.theme ?? 'dark';
@@ -130,6 +182,14 @@ function App() {
       mediaQuery.removeEventListener('change', onThemeChange);
     };
   }, [settings?.theme]);
+
+  useEffect(() => {
+    if (selectedAgent && pendingMessage) {
+      const msg = pendingMessage;
+      setPendingMessage(null);
+      handleSendMessage(msg);
+    }
+  }, [selectedAgent, pendingMessage]);
 
   useEffect(() => {
     loadInitialData();
@@ -176,19 +236,62 @@ function App() {
       });
     };
 
+    const handleAgentMessage = ({ agentId, message }: { agentId: string; message: any }) => {
+      console.log('[DEBUG] Received agent:message:', agentId, message);
+      setAgents(prev => prev.map(agent => {
+        if (agent.id === agentId) {
+          // Check if message already exists to avoid duplicates
+          if (agent.messages.some(m => m.id === message.id)) {
+            return agent;
+          }
+          return {
+            ...agent,
+            messages: [...agent.messages, message]
+          };
+        }
+        return agent;
+      }));
+
+      // Update selected agent if it's the one that sent/received the message
+      setSelectedAgent(prev => {
+        if (prev?.id === agentId) {
+          if (prev.messages.some(m => m.id === message.id)) {
+            return prev;
+          }
+          return {
+            ...prev,
+            messages: [...prev.messages, message]
+          };
+        }
+        return prev;
+      });
+    };
+
     window.electronAPI.on('agent:streamChunk', handleStreamChunk);
     window.electronAPI.on('agent:streamEnd', handleStreamEnd);
     window.electronAPI.on('agent:streamError', handleStreamError);
+    window.electronAPI.on('agent:message', handleAgentMessage);
 
     return () => {
       window.electronAPI.removeListener('agent:streamChunk', handleStreamChunk);
       window.electronAPI.removeListener('agent:streamEnd', handleStreamEnd);
       window.electronAPI.removeListener('agent:streamError', handleStreamError);
+      window.electronAPI.removeListener('agent:message', handleAgentMessage);
     };
   }, []);
 
   const loadInitialData = async () => {
+    console.log('[DEBUG] loadInitialData - electronAPI:', window.electronAPI);
+    
+    // Safety timeout: force loading to end after 5 seconds if IPC hangs
+    const timeout = setTimeout(() => {
+      console.warn('[DEBUG] loadInitialData timed out, forcing isLoading to false');
+      setIsLoading(false);
+    }, 5000);
+
     if (!window.electronAPI) {
+      console.error('[DEBUG] electronAPI not available in loadInitialData');
+      clearTimeout(timeout);
       setIsLoading(false);
       return;
     }
@@ -207,19 +310,38 @@ function App() {
         window.electronAPI.settings.getAll()
       ]);
 
-      setAgents(agentsData);
-      setSkills(skillsData);
-      setAutomations(automationsData);
-      setProviders(providersData);
+      setAgents(agentsData || []);
+      setSkills(skillsData || []);
+      setAutomations(automationsData || []);
+      setProviders(providersData || []);
       setSettings(settingsData);
+
+      // Optionally load worktrees for each agent's project path
+      const projectPaths = [...new Set((agentsData || []).map((a: any) => a.projectPath))];
+      const allWorktrees: Worktree[] = [];
+      for (const path of projectPaths) {
+        try {
+          const ws = await window.electronAPI.worktree.list(path);
+          if (ws) allWorktrees.push(...ws);
+        } catch (e) {
+          console.warn(`Failed to load worktrees for ${path}`, e);
+        }
+      }
+      setWorktrees(allWorktrees);
     } catch (error) {
       console.error('Failed to load initial data:', error);
     } finally {
+      clearTimeout(timeout);
       setIsLoading(false);
     }
   };
 
   const handleCreateAgent = async (config: any) => {
+    console.log('[DEBUG] handleCreateAgent called, electronAPI:', window.electronAPI);
+    if (!window.electronAPI) {
+      console.error('[DEBUG] electronAPI is undefined!');
+      throw new Error('Electron API not available');
+    }
     try {
       const newAgent = await window.electronAPI.agent.create(config);
       setAgents(prev => [...prev, newAgent]);
@@ -250,6 +372,15 @@ function App() {
     }
   };
 
+  const handleDeleteWorktree = async (worktreePath: string) => {
+    try {
+      await window.electronAPI.worktree.remove(worktreePath);
+      setWorktrees(prev => prev.filter(w => w.path !== worktreePath));
+    } catch (error) {
+      console.error('Failed to delete worktree:', error);
+    }
+  };
+
   const handleCreateSkill = async (config: any) => {
     try {
       const newSkill = await window.electronAPI.skills.create(config);
@@ -272,6 +403,15 @@ function App() {
     }
   };
 
+  const handleDeleteAutomation = async (automationId: string) => {
+    try {
+      await window.electronAPI.automation.delete(automationId);
+      setAutomations(prev => prev.filter(a => a.id !== automationId));
+    } catch (error) {
+      console.error('Failed to delete automation:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <div 
@@ -280,127 +420,163 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center',
           height: '100vh',
-          background: 'var(--bg-void)'
+          width: '100vw',
+          background: '#0f0f0f',
+          color: '#dedede'
         }}
-        data-testid="app-loading"
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              border: '2px solid var(--border-default)',
-              borderTopColor: 'var(--teal-500)',
-              animation: 'spin 0.6s linear infinite'
-            }} />
-          </div>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', animation: 'pulse 2s ease-in-out infinite' }}>Loading Codex...</p>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            border: '2px solid #333',
+            borderTopColor: '#00dfc0',
+            animation: 'spin 0.6s linear infinite'
+          }} />
+          <p>Loading Codex Linux...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <I18nProvider>
-      <div 
-        className="app-shell"
-        data-testid="app-container"
-      >
-        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
-        
-        <div className="app-main">
-          {activeTab !== 'chat' && (
-            <Header 
-              activeTab={activeTab}
-              agents={agents}
-              onSettingsClick={() => handleTabChange('settings')}
-            />
-          )}
+  try {
+    return (
+      <I18nProvider>
+        <div 
+          className="app-shell"
+          style={{ height: '100vh', width: '100vw', display: 'flex', overflow: 'hidden' }}
+          data-testid="app-container"
+        >
+          <Sidebar 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange} 
+            agents={agents}
+            selectedAgentId={selectedAgent?.id}
+            onSelectAgent={handleSelectAgent}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            width={sidebarWidth}
+            onResize={setSidebarWidth}
+          />
           
-          <main 
-            className={`app-content dot-grid-bg animate-fadeIn`}
-            data-testid="main-content"
-          >
-            <Routes>
-              <Route 
-                path="/" 
-                element={
-                  <WelcomeChat 
-                    agents={agents}
-                    providers={providers}
-                    skills={skills}
-                    onCreateAgent={handleCreateAgent}
-                  />
-                } 
+          <div className="app-main">
+            {activeTab !== 'chat' && (
+              <Header 
+                activeTab={activeTab}
+                agents={agents}
+                onSettingsClick={() => handleTabChange('settings')}
               />
-              <Route 
-                path="/agents" 
-                element={
-                  <AgentPanel 
-                    agents={agents}
-                    providers={providers}
-                    skills={skills}
-                    onCreateAgent={handleCreateAgent}
-                    onDeleteAgent={handleDeleteAgent}
-                  />
-                } 
-              />
-              <Route 
-                path="/code" 
-                element={
-                  <CodeWorkspace rootPath="/" />
-                } 
-              />
-              <Route 
-                path="/worktrees" 
-                element={
-                  <WorktreePanel 
-                    worktrees={worktrees}
-                    onCreateWorktree={handleCreateWorktree}
-                  />
-                } 
-              />
-              <Route 
-                path="/skills" 
-                element={
-                  <SkillsPanel 
-                    skills={skills}
-                    onCreateSkill={handleCreateSkill}
-                  />
-                } 
-              />
-              <Route 
-                path="/automations" 
-                element={
-                  <AutomationPanel 
-                    automations={automations}
-                    agents={agents}
-                    skills={skills}
-                    onCreateAutomation={handleCreateAutomation}
-                  />
-                } 
-              />
-              <Route 
-                path="/audit" 
-                element={<AuditTrailPanel />} 
-              />
-              <Route 
-                path="/settings" 
-                element={
-                  <SettingsPanel 
-                    settings={settings!}
-                    providers={providers}
-                    onSettingsChange={setSettings}
-                  />
-                } 
-              />
-            </Routes>
-          </main>
+            )}
+            
+            <main 
+              className={`app-content dot-grid-bg animate-fadeIn`}
+              data-testid="main-content"
+            >
+              <Routes>
+                <Route 
+                  path="/" 
+                  element={
+                    selectedAgent ? (
+                      <div className="h-full pt-6 px-4 pb-4">
+                        <ChatInterface 
+                          agent={selectedAgent}
+                          onSendMessage={handleSendMessage}
+                          onExecuteTask={handleExecuteTask}
+                          onModelChange={handleModelChange}
+                          providers={providers}
+                        />
+                      </div>
+                    ) : (
+                      <WelcomeChat 
+                        agents={agents}
+                        providers={providers}
+                        skills={skills}
+                        onCreateAgent={handleCreateAgent}
+                        onAgentCreated={(agent, message) => handleSelectAgent(agent, message)}
+                      />
+                    )
+                  } 
+                />
+                <Route 
+                  path="/agents" 
+                  element={
+                    <AgentPanel 
+                      agents={agents}
+                      providers={providers}
+                      skills={skills}
+                      onCreateAgent={handleCreateAgent}
+                      onDeleteAgent={handleDeleteAgent}
+                    />
+                  } 
+                />
+                <Route 
+                  path="/code" 
+                  element={
+                    <CodeWorkspace rootPath="/" />
+                  } 
+                />
+                <Route 
+                  path="/worktrees" 
+                  element={
+                    <WorktreePanel 
+                      worktrees={worktrees}
+                      onCreateWorktree={handleCreateWorktree}
+                      onDeleteWorktree={handleDeleteWorktree}
+                    />
+                  } 
+                />
+                <Route 
+                  path="/skills" 
+                  element={
+                    <SkillsPanel 
+                      skills={skills}
+                      onCreateSkill={handleCreateSkill}
+                    />
+                  } 
+                />
+                <Route 
+                  path="/automations" 
+                  element={
+                    <AutomationPanel 
+                      automations={automations}
+                      agents={agents}
+                      skills={skills}
+                      onCreateAutomation={handleCreateAutomation}
+                      onDeleteAutomation={handleDeleteAutomation}
+                    />
+                  } 
+                />
+                <Route 
+                  path="/audit" 
+                  element={<AuditTrailPanel />} 
+                />
+                <Route 
+                  path="/settings" 
+                  element={
+                    <SettingsPanel 
+                      settings={settings!}
+                      providers={providers}
+                      onSettingsChange={setSettings}
+                    />
+                  } 
+                />
+              </Routes>
+            </main>
+          </div>
         </div>
+      </I18nProvider>
+    );
+  } catch (error) {
+    return (
+      <div style={{ padding: 40, background: '#0f0f0f', color: '#e85a6a', height: '100vh' }}>
+        <h1>Application Error</h1>
+        <pre>{(error as Error).message}</pre>
+        <button onClick={() => window.location.reload()} className="btn btn-primary mt-4">Reload</button>
       </div>
-    </I18nProvider>
-  );
+    );
+  }
+}
 }
 
 export default App;

@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import log from 'electron-log';
 import { AIProviderManager } from '../providers/AIProviderManager';
+import { SettingsManager } from '../SettingsManager';
 
 interface CodeSuggestion {
   id: string;
@@ -24,14 +25,28 @@ interface InlineCompletion {
 }
 
 export class SmartCodeAssistant extends EventEmitter {
-  private aiProviderManager: AIProviderManager;
   private currentFile: string = '';
   private currentContent: string = '';
   private cursorPosition: { line: number; column: number } = { line: 0, column: 0 };
 
-  constructor(aiProviderManager: AIProviderManager) {
+  constructor(
+    private aiProviderManager: AIProviderManager,
+    private settingsManager: SettingsManager
+  ) {
     super();
-    this.aiProviderManager = aiProviderManager;
+  }
+
+  private getModel(): string {
+    const defaultModel = this.settingsManager.getAny('defaultModel') as string;
+    if (defaultModel) return defaultModel;
+    
+    // Fallback to active provider's first model
+    const activeProvider = this.aiProviderManager.getActiveProvider();
+    if (activeProvider && activeProvider.models.length > 0) {
+      return activeProvider.models[0].id;
+    }
+    
+    return 'gpt-4o-mini'; // Ultimate fallback
   }
 
   async provideInlineCompletion(
@@ -63,7 +78,7 @@ Provide ONLY the completion text that should be inserted at the cursor. Be conci
       const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return null;
 
-      const response = await provider.sendMessage('gpt-4o-mini', [
+      const response = await provider.sendMessage(this.getModel(), [
         { role: 'system', content: 'You are a code completion assistant. Provide only the code completion, no explanations.' },
         { role: 'user', content: prompt },
       ] as Array<{ role: string; content: string }>);
@@ -106,7 +121,7 @@ Return a JSON array of suggestions with: type, line, description, and suggested 
       const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return suggestions;
 
-      const response = await provider.sendMessage('gpt-4o', [
+      const response = await provider.sendMessage(this.getModel(), [
         { role: 'system', content: 'You are a code reviewer. Provide suggestions in JSON format.' },
         { role: 'user', content: prompt },
       ] as Array<{ role: string; content: string }>);
@@ -165,7 +180,7 @@ Provide:
       const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return '';
 
-      const response = await provider.sendMessage('gpt-4o', [
+      const response = await provider.sendMessage(this.getModel(), [
         { role: 'system', content: 'You are a technical documentation writer.' },
         { role: 'user', content: prompt },
       ] as Array<{ role: string; content: string }>);
@@ -190,7 +205,7 @@ ${detailLevel === 'simple' ? 'Explain it simply for a beginner.' : 'Provide a de
       const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return '';
 
-      const response = await provider.sendMessage('gpt-4o', [
+      const response = await provider.sendMessage(this.getModel(), [
         { role: 'system', content: 'You are a programming teacher.' },
         { role: 'user', content: prompt },
       ]);
@@ -220,7 +235,7 @@ Provide the refactored code with explanations of what changed and why.`;
       const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return '';
 
-      const response = await provider.sendMessage('gpt-4o', [
+      const response = await provider.sendMessage(this.getModel(), [
         { role: 'system', content: 'You are an expert code refactorer.' },
         { role: 'user', content: prompt },
       ] as Array<{ role: string; content: string }>);

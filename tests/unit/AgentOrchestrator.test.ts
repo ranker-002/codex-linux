@@ -232,13 +232,14 @@ describe('AgentOrchestrator', () => {
         name: 'Test Agent',
         projectPath: '/test/project',
         worktreeName: 'codex-agent-test',
+        worktreePath: '/test/project/.codex/worktrees/codex-agent-test',
+        tasks: [],
       } as any);
 
       await orchestrator.deleteAgent('agent-1');
 
       expect(mockGitWorktreeManager.removeWorktree).toHaveBeenCalledWith(
-        '/test/project',
-        'codex-agent-test'
+        '/test/project/.codex/worktrees/codex-agent-test'
       );
       expect(mockDbManager.deleteAgent).toHaveBeenCalledWith('agent-1');
     });

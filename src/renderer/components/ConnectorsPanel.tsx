@@ -191,7 +191,7 @@ export const ConnectorsPanel: React.FC<ConnectorsPanelProps> = ({
             <Plug className="w-16 h-16 mb-4 opacity-30" />
             <h3 className="text-lg font-medium">No Connectors</h3>
             <p className="text-sm mt-2 text-center max-w-md">
-              Connect external services like Slack, GitHub, Linear, and more to extend Claude&apos;s capabilities
+              Connect external services like Slack, GitHub, Linear, and more to extend Codlux&apos;s capabilities
             </p>
             <button
               onClick={() => setShowAddModal(true)}

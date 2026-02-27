@@ -4,6 +4,7 @@ import log from 'electron-log';
 import { AgentOrchestrator } from '../agents/AgentOrchestrator';
 import { AIProviderManager } from '../providers/AIProviderManager';
 import { SmartCodeAssistant } from '../assistant/SmartCodeAssistant';
+import { SettingsManager } from '../SettingsManager';
 import { Agent, AgentMessage } from '../../shared/types';
 
 interface PairSession {
@@ -31,15 +32,18 @@ export class AIPairProgramming extends EventEmitter {
   private agentOrchestrator: AgentOrchestrator;
   private aiProviderManager: AIProviderManager;
   private smartAssistant: SmartCodeAssistant;
+  private settingsManager: SettingsManager;
 
   constructor(
     agentOrchestrator: AgentOrchestrator,
-    aiProviderManager: AIProviderManager
+    aiProviderManager: AIProviderManager,
+    settingsManager: SettingsManager
   ) {
     super();
     this.agentOrchestrator = agentOrchestrator;
     this.aiProviderManager = aiProviderManager;
-    this.smartAssistant = new SmartCodeAssistant(aiProviderManager);
+    this.settingsManager = settingsManager;
+    this.smartAssistant = new SmartCodeAssistant(aiProviderManager, settingsManager);
   }
 
   async startSession(
@@ -48,13 +52,16 @@ export class AIPairProgramming extends EventEmitter {
     userId: string
   ): Promise<PairSession> {
     const sessionId = uuidv4();
+    
+    const defaultProvider = this.settingsManager.getAny('defaultProvider') as string || 'openai';
+    const defaultModel = this.settingsManager.getAny('defaultModel') as string || 'gpt-4o';
 
     // Create AI pair programmer agent
     const agent = await this.agentOrchestrator.createAgent({
       name: `Pair Programmer - ${mode}`,
       projectPath,
-      providerId: 'openai',
-      model: 'gpt-4o',
+      providerId: defaultProvider,
+      model: defaultModel,
       skills: ['refactoring', 'testing', 'code-review'],
     });
 
@@ -142,7 +149,9 @@ As a ${session.mode} pair programmer, provide a brief, helpful suggestion or ins
       const provider = this.aiProviderManager.getActiveProviderInstance();
       if (!provider) return;
 
-      const response = await provider.sendMessage('gpt-4o-mini', [
+      const defaultModel = this.settingsManager.getAny('defaultModel') as string || 'gpt-4o-mini';
+
+      const response = await provider.sendMessage(defaultModel, [
         { role: 'system', content: 'You are a helpful pair programmer.' },
         { role: 'user', content: prompt },
       ] as Array<{ role: string; content: string }>);

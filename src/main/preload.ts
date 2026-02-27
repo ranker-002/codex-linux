@@ -1,19 +1,27 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
-contextBridge.exposeInMainWorld('electronAPI', {
-  // Window controls
-  window: {
-    minimize: () => ipcRenderer.invoke('window:minimize'),
-    maximize: () => ipcRenderer.invoke('window:maximize'),
-    close: () => ipcRenderer.invoke('window:close'),
-  },
+// Direct execution test
+try {
+  (window as any).PRELOAD_LOADED = true;
+  console.log('[DEBUG] Preload script execution started, PRELOAD_LOADED set to true');
+} catch (e) {
+  console.error('[DEBUG] Failed to set PRELOAD_LOADED', e);
+}
+
+// Standard way to expose APIs
+try {
+  contextBridge.exposeInMainWorld('electronAPI', {
+    // Window controls
+    window: {
+      minimize: () => ipcRenderer.invoke('window:minimize'),
+      maximize: () => ipcRenderer.invoke('window:maximize'),
+      close: () => ipcRenderer.invoke('window:close'),
+    },
 
   // Dialog operations
   dialog: {
     selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
-    selectFile: (filters?: Electron.FileFilter[]) => ipcRenderer.invoke('dialog:selectFile', filters),
+    selectFile: (filters?: any[]) => ipcRenderer.invoke('dialog:selectFile', filters),
   },
 
   // Shell operations
@@ -27,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (config: any) => ipcRenderer.invoke('agent:create', config),
     list: () => ipcRenderer.invoke('agent:list'),
     get: (agentId: string) => ipcRenderer.invoke('agent:get', agentId),
+    update: (agentId: string, updates: any) => ipcRenderer.invoke('agent:update', agentId, updates),
     sendMessage: (agentId: string, message: string) => ipcRenderer.invoke('agent:sendMessage', agentId, message),
     sendMessageStream: (agentId: string, message: string) => ipcRenderer.invoke('agent:sendMessageStream', agentId, message),
     executeTask: (agentId: string, task: string) => ipcRenderer.invoke('agent:executeTask', agentId, task),
@@ -69,7 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   worktree: {
     create: (repoPath: string, name: string) => ipcRenderer.invoke('worktree:create', repoPath, name),
     list: (repoPath: string) => ipcRenderer.invoke('worktree:list', repoPath),
-    remove: (repoPath: string, name: string) => ipcRenderer.invoke('worktree:remove', repoPath, name),
+    remove: (worktreePath: string) => ipcRenderer.invoke('worktree:remove', worktreePath),
   },
 
   // Skills operations
@@ -161,55 +170,57 @@ contextBridge.exposeInMainWorld('electronAPI', {
     diff: ({ repoPath, filePath }: { repoPath: string; filePath?: string }) => ipcRenderer.invoke('git:diff', { repoPath, filePath }),
   },
 
-  // Search operations
-  search: {
-    files: ({ query, path, pattern }: { query: string; path: string; pattern?: string }) => ipcRenderer.invoke('search:files', { query, path, pattern }),
-  },
-
-  // Notifications
-  notification: {
-    show: ({ title, body }: { title: string; body: string }) => ipcRenderer.invoke('notification:show', { title, body }),
-  },
-
-  // Export/Import
-  data: {
-    export: (exportPath: string) => ipcRenderer.invoke('data:export', exportPath),
-    import: (importPath: string) => ipcRenderer.invoke('data:import', importPath),
-  },
-
-  // Event listeners
-  on: (channel: string, callback: (...args: any[]) => void) => {
-    const validChannels = [
-      'agent:message',
-      'agent:status',
-      'agent:progress',
-      'agent:error',
-      'agent:streamChunk',
-      'agent:streamEnd',
-      'agent:streamError',
-      'agent:taskStarted',
-      'agent:taskCompleted',
-      'agent:taskFailed',
-      'agent:paused',
-      'agent:resumed',
-      'agent:stopped',
-      'changes:created',
-      'automation:triggered',
-      'worktree:changed',
-      'skill:applied',
-      'terminal:data',
-      'notification:show'
-    ];
-    if (validChannels.includes(channel)) {
-      ipcRenderer.on(channel, callback);
-    }
-  },
-
-  removeListener: (channel: string, callback: (...args: any[]) => void) => {
-    ipcRenderer.removeListener(channel, callback);
-  },
-});
-
-export type ElectronAPI = {
-  // Define the type without referencing window
+      // Search operations
+      search: {
+        files: ({ query, path, pattern }: { query: string; path: string; pattern?: string }) => ipcRenderer.invoke('search:files', { query, path, pattern }),
+      },
+  
+      // Notifications
+      notification: {
+        show: ({ title, body }: { title: string; body: string }) => ipcRenderer.invoke('notification:show', { title, body }),
+      },
+  
+      // Export/Import
+      data: {
+        export: (exportPath: string) => ipcRenderer.invoke('data:export', exportPath),
+        import: (importPath: string) => ipcRenderer.invoke('data:import', importPath),
+      },
+  
+      // Event listeners
+      on: (channel: string, callback: (...args: any[]) => void) => {
+        const validChannels = [
+          'agent:message',
+          'agent:status',
+          'agent:progress',
+          'agent:error',
+          'agent:streamChunk',
+          'agent:streamEnd',
+          'agent:streamError',
+          'agent:taskStarted',
+          'agent:taskCompleted',
+          'agent:taskFailed',
+          'agent:paused',
+          'agent:resumed',
+          'agent:stopped',
+          'changes:created',
+          'automation:triggered',
+          'worktree:changed',
+          'skill:applied',
+          'terminal:data',
+          'notification:show'
+        ];
+        if (validChannels.includes(channel)) {
+          ipcRenderer.on(channel, callback);
+        }
+      },
+  
+              removeListener: (channel: string, callback: (...args: any[]) => void) => {
+                ipcRenderer.removeListener(channel, callback);
+              },
+            });
+          } catch (error) {
+            console.error('[DEBUG] Failed to expose electronAPI:', error);
+          }
+          
+          export type ElectronAPI = {  // Define the type without referencing window
 };

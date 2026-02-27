@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Agent, AgentMessage, PermissionMode } from '../../shared/types';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Agent, AgentMessage, PermissionMode, AIProvider } from '../../shared/types';
 import { Send, Bot, User, Loader2, Paperclip, MoreVertical, Copy, Check, ChevronDown, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { PermissionSelector } from './PermissionSelector';
@@ -23,6 +23,7 @@ interface ChatInterfaceProps {
   isLoading?: boolean;
   availableModels?: ModelOption[];
   currentModel?: string;
+  providers?: AIProvider[];
 }
 
 const FREE_MODELS: ModelOption[] = [
@@ -61,6 +62,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   isLoading = false,
   availableModels,
   currentModel,
+  providers = [],
 }) => {
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -73,7 +75,26 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
 
-  const models = availableModels || FREE_MODELS;
+  const models = useMemo(() => {
+    if (availableModels) return availableModels;
+    
+    const providerModels: ModelOption[] = [];
+    
+    providers.forEach(provider => {
+      provider.models.forEach(model => {
+        providerModels.push({
+          id: model.id,
+          name: model.name,
+          backend: provider.id,
+          isFree: provider.isFree,
+          contextWindow: model.contextWindow,
+          supportsVision: model.supportsVision,
+        });
+      });
+    });
+    
+    return providerModels.length > 0 ? providerModels : FREE_MODELS;
+  }, [availableModels, providers]);
 
   useEffect(() => {
     scrollToBottom();
@@ -126,19 +147,28 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     
-    const message = input;
+    const messageText = input;
+    
+    const userMessage: AgentMessage = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content: messageText,
+      timestamp: new Date()
+    };
+    
+    agent.messages = [...agent.messages, userMessage];
     setInput('');
     
-    if (message.startsWith('/task ')) {
-      await onExecuteTask(message.slice(6));
-    } else if (message.startsWith('/search ')) {
-      const searchQuery = message.slice(8);
+    if (messageText.startsWith('/task ')) {
+      await onExecuteTask(messageText.slice(6));
+    } else if (messageText.startsWith('/search ')) {
+      const searchQuery = messageText.slice(8);
       await onSendMessage(`[SEARCH] ${searchQuery}`);
-    } else if (message.startsWith('/vision ') || message.startsWith('/analyze ')) {
-      const visionQuery = message.split(' ').slice(1).join(' ');
+    } else if (messageText.startsWith('/vision ') || messageText.startsWith('/analyze ')) {
+      const visionQuery = messageText.split(' ').slice(1).join(' ');
       await onSendMessage(`[VISION] ${visionQuery}`);
     } else {
-      await onSendMessage(message);
+      await onSendMessage(messageText);
     }
   };
 
@@ -230,8 +260,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-primary)]">
-      <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--bg-surface)]">
-        <div className="flex items-center gap-3">
+      <div className="px-3 py-2 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--bg-surface)]">
+        <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${
             agent.status === 'running' ? 'bg-[var(--success)] animate-pulse' :
             agent.status === 'error' ? 'bg-[var(--error)]' :
@@ -239,93 +269,49 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             'bg-[var(--text-muted)]'
           }`} />
           <div>
-            <h3 className="font-medium text-[13px] text-[var(--text-primary)]">{agent.name}</h3>
+            <h3 className="font-medium text-[12px] text-[var(--text-primary)]">{agent.name}</h3>
           </div>
         </div>
         
         <div className="relative" ref={modelSelectorRef}>
           <button
             onClick={() => setShowModelSelector(!showModelSelector)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[12px] border border-[var(--border-subtle)]"
+            className="flex items-center gap-1.5 px-2 py-1 bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] rounded transition-colors text-[11px] border border-[var(--border-subtle)]"
           >
-            <Sparkles className="w-3.5 h-3.5 text-[var(--success)]" />
-            <span className="font-medium truncate max-w-[150px] text-[var(--text-primary)]">{currentModelInfo.name}</span>
-            <span className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 bg-[var(--bg-hover)] rounded">
-              {BACKEND_LABELS[currentModelInfo.backend || 'unknown'] || currentModelInfo.backend}
-            </span>
-            <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
+            <Sparkles className="w-3 h-3 text-[var(--success)]" />
+            <span className="font-medium truncate max-w-[120px] text-[var(--text-primary)]">{currentModelInfo.name}</span>
+            <ChevronDown className={`w-3 h-3 text-[var(--text-muted)] transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
           </button>
 
           {showModelSelector && (
-            <div className="absolute top-full right-0 mt-2 w-80 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] shadow-xl z-50 max-h-[70vh] overflow-hidden">
-              <div className="p-3 border-b border-[var(--border-subtle)]">
+            <div className="absolute top-full right-0 mt-1 w-64 bg-[var(--bg-surface)] border border-[var(--border-faint)] rounded-md shadow-lg z-50 overflow-hidden">
+              <div className="p-2">
                 <input
                   type="text"
-                  placeholder="Search models..."
+                  placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--teal-500)] border border-[var(--border-subtle)]"
+                  className="w-full px-2 py-1.5 bg-[var(--bg-primary)] rounded text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none border border-[var(--border-faint)]"
                 />
-                <div className="flex gap-1 mt-2 flex-wrap">
-                  <button
-                    onClick={() => setSelectedBackend('all')}
-                    className={`px-2 py-1 text-[10px] rounded-md transition-colors ${
-                      selectedBackend === 'all' ? 'bg-[var(--teal-500)] text-[var(--bg-void)]' : 'bg-[var(--bg-hover)] hover:bg-[var(--bg-active)] text-[var(--text-secondary)]'
-                    }`}
-                  >
-                    All
-                  </button>
-                  {Object.entries(BACKEND_LABELS).map(([key, label]) => (
-                    <button
-                      key={key}
-                      onClick={() => setSelectedBackend(key)}
-                      className={`px-2 py-1 text-[10px] rounded-md transition-colors ${
-                        selectedBackend === key ? 'bg-[var(--teal-500)] text-[var(--bg-void)]' : 'bg-[var(--bg-hover)] hover:bg-[var(--bg-active)] text-[var(--text-secondary)]'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
-              <div className="overflow-y-auto max-h-[50vh]">
+              <div className="overflow-y-auto max-h-48">
                 {Object.entries(groupedModels).map(([backend, backendModels]) => (
                   <div key={backend}>
-                    <div className="px-3 py-2 bg-[var(--bg-elevated)] text-[10px] font-medium text-[var(--text-muted)] sticky top-0">
-                      {BACKEND_LABELS[backend] || backend} ({backendModels.length})
+                    <div className="px-2 py-1 text-[9px] font-medium text-[var(--text-muted)] uppercase bg-[var(--bg-primary)]">
+                      {BACKEND_LABELS[backend] || backend}
                     </div>
                     {backendModels.map((model) => (
                       <button
                         key={model.id}
                         onClick={() => handleModelSelect(model.id)}
-                        className={`w-full px-3 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors flex items-center justify-between ${
-                          selectedModel === model.id ? 'bg-[rgba(0,200,168,0.08)]' : ''
+                        className={`w-full px-2 py-1.5 text-left hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2 ${
+                          selectedModel === model.id ? 'bg-[var(--a-500)] bg-opacity-10' : ''
                         }`}
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-[12px] truncate text-[var(--text-primary)]">{model.name}</span>
-                            {model.isFree && (
-                              <span className="px-1.5 py-0.5 text-[9px] bg-[rgba(60,200,120,0.1)] text-[var(--success)] rounded">
-                                FREE
-                              </span>
-                            )}
-                            {model.supportsVision && (
-                              <span className="px-1.5 py-0.5 text-[9px] bg-[rgba(104,144,244,0.1)] text-[var(--info)] rounded">
-                                VISION
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-[var(--text-muted)] truncate">{model.id}</div>
-                        </div>
-                        {model.contextWindow && model.contextWindow >= 100000 && (
-                          <span className="text-[10px] text-[var(--text-muted)] ml-2">
-                            {model.contextWindow >= 1000000 ? '1M' : `${model.contextWindow / 1000}K`}
-                          </span>
-                        )}
+                        <span className="text-[11px] truncate text-[var(--text-primary)]">{model.name}</span>
                         {selectedModel === model.id && (
-                          <Check className="w-3.5 h-3.5 text-[var(--teal-400)] ml-2" />
+                          <Check className="w-3 h-3 text-[var(--a-500)] ml-auto" />
                         )}
                       </button>
                     ))}
@@ -353,22 +339,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {agent.messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
-            <Bot className="w-16 h-16 mb-4 opacity-30" />
-            <p className="text-[15px] font-medium text-[var(--text-primary)]">Start a conversation</p>
-            <p className="text-[12px] mt-2">Send a message or use /task to assign a task</p>
-            <div className="mt-6 space-y-2 text-[12px]">
+            <Bot className="w-12 h-12 mb-3 opacity-30" />
+            <p className="text-[13px] font-medium text-[var(--text-primary)]">Start a conversation</p>
+            <p className="text-[11px] mt-1">Send a message or use /task to assign a task</p>
+            <div className="mt-4 space-y-2 text-[11px]">
               <button 
                 onClick={() => setInput('Can you help me refactor this code?')}
-                className="block px-4 py-2 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] hover:border-[var(--border-accent)] transition-colors text-[var(--text-secondary)]"
+                className="block px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] hover:border-[var(--border-accent)] transition-colors text-[var(--text-secondary)]"
               >
                 "Can you help me refactor this code?"
               </button>
               <button 
                 onClick={() => setInput('/task Review all JavaScript files for potential bugs')}
-                className="block px-4 py-2 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] hover:border-[var(--border-accent)] transition-colors text-[var(--text-secondary)]"
+                className="block px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] hover:border-[var(--border-accent)] transition-colors text-[var(--text-secondary)]"
               >
                 "/task Review all JavaScript files..."
               </button>
@@ -378,11 +364,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           agent.messages.map((message) => (
             <div
               key={message.id}
-              className={`group flex gap-3 ${
+              className={`group flex gap-2 ${
                 message.role === 'user' ? 'flex-row-reverse' : ''
               }`}
             >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
                 message.role === 'user' 
                   ? 'bg-[var(--teal-500)] text-[var(--bg-void)]' 
                   : message.role === 'system'
@@ -390,22 +376,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   : 'bg-[rgba(0,200,168,0.1)] text-[var(--teal-400)]'
               }`}>
                 {message.role === 'user' ? (
-                  <User className="w-4 h-4" />
+                  <User className="w-3 h-3" />
                 ) : message.role === 'system' ? (
-                  <span className="text-[10px] font-bold">S</span>
+                  <span className="text-[8px] font-bold">S</span>
                 ) : (
-                  <Bot className="w-4 h-4" />
+                  <Bot className="w-3 h-3" />
                 )}
               </div>
 
               <div className={`flex-1 max-w-[85%] ${
                 message.role === 'user' ? 'items-end' : 'items-start'
               }`}>
-                <div className={`relative rounded-2xl px-4 py-3 ${
+                <div className={`relative rounded-2xl px-3 py-2 ${
                   message.role === 'user'
                     ? 'bg-[var(--teal-500)] text-[var(--bg-void)]'
                     : message.role === 'system'
-                    ? 'bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[12px] italic'
+                    ? 'bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] italic'
                     : 'bg-[var(--bg-card)] border border-[var(--border-subtle)]'
                 }`}>
                   <button
@@ -503,10 +489,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+      <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
         <div className="relative flex items-end gap-2">
-          <button className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-            <Paperclip className="w-5 h-5" />
+          <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+            <Paperclip className="w-4 h-4" />
           </button>
           
           <div className="flex-1 relative">
@@ -515,14 +501,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message... (Shift+Enter for new line, /task for tasks)"
-              className="w-full px-4 py-3 pr-12 bg-[var(--bg-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] resize-none focus:outline-none focus:border-[var(--teal-500)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] min-h-[56px] max-h-[200px]"
+              placeholder="Type a message..."
+              className="w-full px-3 py-2 pr-10 bg-[var(--bg-card)] border border-[var(--border-default)] rounded-[var(--radius-md)] resize-none focus:outline-none focus:border-[var(--teal-500)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] min-h-[40px] max-h-[150px]"
               rows={1}
               style={{ height: 'auto' }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
-                target.style.height = Math.min(target.scrollHeight, 200) + 'px';
+                target.style.height = Math.min(target.scrollHeight, 150) + 'px';
               }}
             />
           </div>
@@ -530,9 +516,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="p-3 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-lg)] hover:bg-[var(--teal-400)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-2 bg-[var(--teal-500)] text-[var(--bg-void)] rounded-[var(--radius-md)] hover:bg-[var(--teal-400)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </button>
         </div>
         

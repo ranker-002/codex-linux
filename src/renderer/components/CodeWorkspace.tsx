@@ -10,7 +10,7 @@ interface CodeWorkspaceProps {
 
 export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) => {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [fileLanguage, setFileLanguage] = useState<string>('plaintext');
   const [isLoading, setIsLoading] = useState(false);
   const [openFiles, setOpenFiles] = useState<string[]>([]);
@@ -59,13 +59,14 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
   const handleFileSelect = useCallback(async (path: string) => {
     if (openFiles.includes(path)) {
       setActiveFile(path);
+      setFileLanguage(getLanguageFromPath(path));
       return;
     }
 
     setIsLoading(true);
     try {
       const content = await window.electronAPI.fs.readFile(path);
-      setFileContent(content);
+      setFileContents(prev => ({ ...prev, [path]: content }));
       setSelectedFile(path);
       setFileLanguage(getLanguageFromPath(path));
       setOpenFiles(prev => [...prev, path]);
@@ -81,6 +82,11 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
     e?.stopPropagation();
     const newOpenFiles = openFiles.filter(f => f !== path);
     setOpenFiles(newOpenFiles);
+    setFileContents(prev => {
+      const newContents = { ...prev };
+      delete newContents[path];
+      return newContents;
+    });
     
     if (activeFile === path) {
       setActiveFile(newOpenFiles[newOpenFiles.length - 1] || null);
@@ -92,7 +98,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
     
     try {
       await window.electronAPI.fs.writeFile(activeFile, content);
-      setFileContent(content);
+      setFileContents(prev => ({ ...prev, [activeFile]: content }));
     } catch (error) {
       console.error('Failed to save file:', error);
     }
@@ -102,6 +108,8 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
     return path.split('/').pop() || path;
   };
 
+  const currentContent = activeFile ? fileContents[activeFile] || '' : '';
+
   return (
     <div className="flex flex-col h-full">
       {/* Tab Bar */}
@@ -110,7 +118,10 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
           {openFiles.map(file => (
             <div
               key={file}
-              onClick={() => setActiveFile(file)}
+              onClick={() => {
+                setActiveFile(file);
+                setFileLanguage(getLanguageFromPath(file));
+              }}
               className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer border-r border-[var(--border-subtle)] min-w-0 ${
                 activeFile === file 
                   ? 'bg-[var(--bg-app)] text-[var(--text-primary)]' 
@@ -149,9 +160,9 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
           <div className="h-full overflow-hidden bg-[var(--bg-app)]">
             {activeFile ? (
               <CodeEditor
-                value={fileContent}
+                value={currentContent}
                 language={fileLanguage}
-                onChange={(value) => setFileContent(value || '')}
+                onChange={(value) => setFileContents(prev => ({ ...prev, [activeFile]: value || '' }))}
                 onSave={handleSaveFile}
                 height="100%"
                 dataTestid="code-workspace-editor"
@@ -176,7 +187,7 @@ export const CodeWorkspace: React.FC<CodeWorkspaceProps> = ({ rootPath = '/' }) 
             <>
               <span>{getFileName(activeFile)}</span>
               <span>{fileLanguage}</span>
-              <span>{fileContent.split('\n').length} lines</span>
+              <span>{currentContent.split('\n').length} lines</span>
             </>
           )}
         </div>

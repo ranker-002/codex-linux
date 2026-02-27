@@ -177,7 +177,7 @@ export const PermissionSelector: React.FC<PermissionSelectorProps> = ({
             
             <p className="text-sm text-muted-foreground mb-4">
               Bypass permission mode is disabled for security reasons. This mode allows 
-              Claude to run without any permission prompts, which can be dangerous.
+              Codlux to run without any permission prompts, which can be dangerous.
             </p>
             
             <p className="text-sm mb-6">

@@ -8,13 +8,15 @@ interface AutomationPanelProps {
   agents: Agent[];
   skills: Skill[];
   onCreateAutomation: (config: any) => Promise<Automation>;
+  onDeleteAutomation?: (automationId: string) => void;
 }
 
 export const AutomationPanel: React.FC<AutomationPanelProps> = ({
   automations,
   agents,
   skills,
-  onCreateAutomation
+  onCreateAutomation,
+  onDeleteAutomation
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newAutomation, setNewAutomation] = useState<{
@@ -92,7 +94,10 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
                   >
                     {automation.enabled ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   </button>
-                  <button className="p-1.5 text-[var(--error)] hover:bg-[rgba(232,90,106,0.1)] rounded-[var(--radius-sm)] transition-colors">
+                  <button 
+                    onClick={() => onDeleteAutomation?.(automation.id)}
+                    className="p-1.5 text-[var(--error)] hover:bg-[rgba(232,90,106,0.1)] rounded-[var(--radius-sm)] transition-colors"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

@@ -108,14 +108,20 @@ export class GitWorktreeManager {
     }
   }
 
-  async removeWorktree(repoPath: string, name: string): Promise<void> {
-    const git = await this.getGitInstance(repoPath);
+  async removeWorktree(worktreePath: string): Promise<void> {
+    // Find the repo path by looking for .codex/worktrees in the path
+    const codexIndex = worktreePath.indexOf(path.join('.codex', 'worktrees'));
+    if (codexIndex === -1) {
+      throw new Error(`Invalid worktree path: ${worktreePath}`);
+    }
     
-    const worktreePath = path.join(repoPath, '.codex', 'worktrees', name);
+    const repoPath = worktreePath.substring(0, codexIndex);
+    const git = await this.getGitInstance(repoPath);
+    const name = path.basename(worktreePath);
     const branchName = `codex/${name}`;
 
     try {
-      // Remove worktree
+      // Remove worktree using the path directly as git worktree remove <path>
       await git.raw(['worktree', 'remove', '--force', worktreePath]);
       
       // Delete branch
@@ -125,10 +131,14 @@ export class GitWorktreeManager {
         log.warn(`Failed to delete branch ${branchName}:`, branchError);
       }
 
-      // Clean up directory
-      await fs.rmdir(worktreePath, { recursive: true }).catch(() => {});
+      // Clean up directory if it still exists
+      try {
+        await fs.rm(worktreePath, { recursive: true, force: true });
+      } catch (error) {
+        // Ignore cleanup errors
+      }
 
-      log.info(`Removed worktree ${name}`);
+      log.info(`Removed worktree ${name} at ${worktreePath}`);
     } catch (error) {
       log.error(`Failed to remove worktree ${name}:`, error);
       throw error;
