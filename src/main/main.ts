@@ -118,6 +118,10 @@ function createWindow(): void {
     icon: path.join(__dirname, '../../assets/icon.png')
   });
 
+  // Remove native app menu bar (File/Edit/View/Window/Help) from the main window.
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.autoHideMenuBar = true;
+
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools();
@@ -425,6 +429,7 @@ async function initializeServices(): Promise<void> {
 // App event handlers
 app.whenReady().then(async () => {
   try {
+    Menu.setApplicationMenu(null);
     await initializeServices();
     createWindow();
     createTray();
