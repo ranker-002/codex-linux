@@ -316,9 +316,10 @@ export class AgentOrchestrator extends EventEmitter {
     this.emit('agent:message', { agentId, message: userMessage });
 
     try {
-      const provider = this.aiProviderManager.getProvider(agent.providerId);
+      const providerId = agent.providerId === 'free' ? 'free-models' : agent.providerId;
+      const provider = this.aiProviderManager.getProvider(providerId);
       if (!provider) {
-        throw new Error(`Provider ${agent.providerId} not found`);
+        throw new Error(`Provider ${providerId} not found`);
       }
 
       const autoContext = await this.buildAutoContext(agent, message);
@@ -421,9 +422,10 @@ export class AgentOrchestrator extends EventEmitter {
     },
     ephemeralSystemMessage?: AgentMessage
   ): Promise<{ content: string; metadata?: Record<string, any> }> {
-    const provider = this.aiProviderManager.getProvider(agent.providerId);
+    const providerId = agent.providerId === 'free' ? 'free-models' : agent.providerId;
+    const provider = this.aiProviderManager.getProvider(providerId);
     if (!provider) {
-      throw new Error(`Provider ${agent.providerId} not found`);
+      throw new Error(`Provider ${providerId} not found`);
     }
 
     const messages = (

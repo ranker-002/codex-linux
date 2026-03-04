@@ -20,26 +20,26 @@ interface WelcomeChatProps {
 }
 
 const FREE_MODELS = [
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', providerId: 'free' },
-  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1', providerId: 'free' },
-  { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', providerId: 'free' },
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', providerId: 'free' },
-  { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder', providerId: 'free' },
-  { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B', providerId: 'free' },
-  { id: 'z-ai/glm-4.5-air:free', name: 'GLM 4.5 Air', providerId: 'free' },
-  { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Groq)', providerId: 'free' },
-  { id: 'llama3.2:latest', name: 'Llama 3.2 (Ollama)', providerId: 'free' },
-  { id: 'llama3.3:latest', name: 'Llama 3.3 70B (Ollama)', providerId: 'free' },
-  { id: 'mistral:latest', name: 'Mistral 7B (Ollama)', providerId: 'free' },
-  { id: 'deepseek-r1:latest', name: 'DeepSeek R1 (Ollama)', providerId: 'free' },
-  { id: 'qwen2.5:latest', name: 'Qwen 2.5 (Ollama)', providerId: 'free' },
-  { id: 'codellama:latest', name: 'Code Llama (Ollama)', providerId: 'free' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', providerId: 'free-models' },
+  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1', providerId: 'free-models' },
+  { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', providerId: 'free-models' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', providerId: 'free-models' },
+  { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder', providerId: 'free-models' },
+  { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B', providerId: 'free-models' },
+  { id: 'z-ai/glm-4.5-air:free', name: 'GLM 4.5 Air', providerId: 'free-models' },
+  { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B (Groq)', providerId: 'free-models' },
+  { id: 'llama3.2:latest', name: 'Llama 3.2 (Ollama)', providerId: 'free-models' },
+  { id: 'llama3.3:latest', name: 'Llama 3.3 70B (Ollama)', providerId: 'free-models' },
+  { id: 'mistral:latest', name: 'Mistral 7B (Ollama)', providerId: 'free-models' },
+  { id: 'deepseek-r1:latest', name: 'DeepSeek R1 (Ollama)', providerId: 'free-models' },
+  { id: 'qwen2.5:latest', name: 'Qwen 2.5 (Ollama)', providerId: 'free-models' },
+  { id: 'codellama:latest', name: 'Code Llama (Ollama)', providerId: 'free-models' },
 ];
 
 const getFreeModels = (providers: AIProvider[]) => {
   const freeProvider = providers.find(p => p.id === 'free-models');
   if (freeProvider && freeProvider.models.length > 0) {
-    return freeProvider.models.map(m => ({ id: m.id, name: m.name, providerId: 'free' }));
+    return freeProvider.models.map(m => ({ id: m.id, name: m.name, providerId: 'free-models' }));
   }
   return FREE_MODELS;
 };
