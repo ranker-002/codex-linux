@@ -20,7 +20,7 @@ const FREE_MODEL_CONFIGS: Record<string, FreeModelConfig> = {
   },
   ollama: {
     provider: 'Ollama',
-    baseUrl: 'http://localhost:11434/v1',
+    baseUrl: 'http://127.0.0.1:11434/v1',
     requiresApiKey: false,
     defaultApiKey: '',
     description: 'Local Ollama server - runs models locally on your machine'
@@ -949,6 +949,32 @@ export class FreeModelsProvider {
     }
   }
 
+  private isOllamaConnRefused(error: any): boolean {
+    return this.activeBackend === 'ollama' && (
+      error?.cause?.code === 'ECONNREFUSED' ||
+      error?.code === 'ECONNREFUSED'
+    );
+  }
+
+  private async withOllamaFallback<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (error: any) {
+      if (!this.isOllamaConnRefused(error)) {
+        throw error;
+      }
+
+      const currentBase = this.config.baseUrl || FREE_MODEL_CONFIGS.ollama.baseUrl;
+      if (currentBase.includes('localhost')) {
+        this.config.baseUrl = currentBase.replace('localhost', '127.0.0.1');
+        this.initializeClient();
+        return await fn();
+      }
+
+      throw new Error('Ollama is not reachable at 127.0.0.1:11434. Start Ollama or select another model backend.');
+    }
+  }
+
   private initializeClient(): void {
     const backendConfig = FREE_MODEL_CONFIGS[this.activeBackend];
     const baseUrl = this.config.baseUrl || backendConfig?.baseUrl || FREE_MODEL_CONFIGS.openrouter.baseUrl;
@@ -1033,9 +1059,9 @@ export class FreeModelsProvider {
     }
 
     try {
-      const response = await this.client.chat.completions.create(requestParams, {
+      const response = await this.withOllamaFallback(async () => this.client!.chat.completions.create(requestParams, {
         signal: options?.signal
-      });
+      }));
 
       const content = response.choices[0]?.message?.content || '';
       const reasoning = (response.choices[0]?.message as any)?.reasoning_content;
@@ -1081,11 +1107,11 @@ export class FreeModelsProvider {
     let fullContent = '';
 
     try {
-      const stream = await this.client.chat.completions.create({
+      const stream = await this.withOllamaFallback(async () => this.client!.chat.completions.create({
         model,
         messages: openaiMessages,
         stream: true
-      });
+      }));
 
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || '';
@@ -1108,7 +1134,7 @@ export class FreeModelsProvider {
   }
 
   async fetchOllamaModels(): Promise<ProviderModel[]> {
-    const ollamaUrl = this.config.baseUrl?.replace('/v1', '') || 'http://localhost:11434';
+    const ollamaUrl = this.config.baseUrl?.replace('/v1', '') || 'http://127.0.0.1:11434';
     const headers: Record<string, string> = {};
     if (this.apiKeys.ollama) {
       headers['Authorization'] = `Bearer ${this.apiKeys.ollama}`;
