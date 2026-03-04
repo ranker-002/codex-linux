@@ -343,7 +343,12 @@ function App() {
       throw new Error('Electron API not available');
     }
     try {
-      const newAgent = await window.electronAPI.agent.create(config);
+      const normalizedConfig = {
+        ...config,
+        name: typeof config?.name === 'string' ? config.name.trim() : config?.name,
+        projectPath: typeof config?.projectPath === 'string' ? config.projectPath.trim() : config?.projectPath
+      };
+      const newAgent = await window.electronAPI.agent.create(normalizedConfig);
       setAgents(prev => [...prev, newAgent]);
       return newAgent;
     } catch (error) {

@@ -53,6 +53,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [workspacePath, setWorkspacePath] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
   const [selectedRuntime, setSelectedRuntime] = useState('local');
   const [showRuntimeDropdown, setShowRuntimeDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
@@ -84,6 +85,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
       const path = await window.electronAPI.dialog.selectFolder();
       if (path) {
         setWorkspacePath(path);
+        setCreateError(null);
       }
     } catch (error) {
       console.error('Failed to select folder:', error);
@@ -92,8 +94,13 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    if (!workspacePath.trim()) {
+      setCreateError('Select a project folder before sending.');
+      return;
+    }
 
     try {
+      setCreateError(null);
       const runtimeProvider = runtimeOptions.find((runtime) => runtime.id === selectedRuntime);
       const modelConfig = freeModels.find((model) => model.id === selectedModel) || freeModels[0];
       const providerId = runtimeProvider?.id === 'local' ? modelConfig.providerId : runtimeProvider?.id;
@@ -115,6 +122,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
       inputRef.current?.focus();
     } catch (error) {
       console.error('Failed to send message:', error);
+      setCreateError(error instanceof Error ? error.message : 'Failed to create agent');
     }
   };
 
@@ -231,7 +239,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
                   </div>
                   <button
                     onClick={() => void handleSend()}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || !workspacePath.trim()}
                     className="welcome-send"
                     data-testid="welcome-send"
                   >
@@ -239,6 +247,9 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
                   </button>
                 </div>
               </div>
+              {createError && (
+                <p className="mt-2 text-[12px] text-[var(--error)]">{createError}</p>
+              )}
             </div>
 
             <div className="welcome-suggestions">
