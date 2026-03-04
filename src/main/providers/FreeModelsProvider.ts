@@ -976,6 +976,13 @@ export class FreeModelsProvider {
       throw new Error('Client not initialized');
     }
 
+    if (this.activeBackend === 'openrouter') {
+      const openRouterKey = this.apiKeys.openrouter || this.config.apiKey || '';
+      if (!openRouterKey.trim()) {
+        throw new Error('OpenRouter API key required. Configure it in Settings > AI Providers > Free Models.');
+      }
+    }
+
     const openaiMessages = messages.map(m => ({
       role: m.role as 'user' | 'assistant' | 'system',
       content: m.content
@@ -1041,6 +1048,13 @@ export class FreeModelsProvider {
   ): Promise<{ content: string }> {
     if (!this.client) {
       throw new Error('Client not initialized');
+    }
+
+    if (this.activeBackend === 'openrouter') {
+      const openRouterKey = this.apiKeys.openrouter || this.config.apiKey || '';
+      if (!openRouterKey.trim()) {
+        throw new Error('OpenRouter API key required. Configure it in Settings > AI Providers > Free Models.');
+      }
     }
 
     const openaiMessages = messages.map(m => ({

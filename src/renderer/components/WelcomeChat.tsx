@@ -53,6 +53,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const [workspacePath, setWorkspacePath] = useState('');
+  const [chatError, setChatError] = useState<string | null>(null);
   const [selectedRuntime, setSelectedRuntime] = useState('local');
   const [showRuntimeDropdown, setShowRuntimeDropdown] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
@@ -94,6 +95,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
     if (!input.trim()) return;
 
     try {
+      setChatError(null);
       const runtimeProvider = runtimeOptions.find((runtime) => runtime.id === selectedRuntime);
       const modelConfig = freeModels.find((model) => model.id === selectedModel) || freeModels[0];
       const providerId = runtimeProvider?.id === 'local' ? modelConfig.providerId : runtimeProvider?.id;
@@ -115,6 +117,7 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
       inputRef.current?.focus();
     } catch (error) {
       console.error('Failed to send message:', error);
+      setChatError(error instanceof Error ? error.message : 'Failed to send message');
     }
   };
 
@@ -239,6 +242,9 @@ export const WelcomeChat: React.FC<WelcomeChatProps> = ({
                   </button>
                 </div>
               </div>
+              {chatError && (
+                <p className="mt-2 text-[12px] text-[var(--error)]">{chatError}</p>
+              )}
             </div>
 
             <div className="welcome-suggestions">
