@@ -52,11 +52,39 @@ get_latest_version() {
     fi
 }
 
+get_appimage_url() {
+    local version=$1
+    local arch=$2
+    local api_url="https://api.github.com/repos/${REPO}/releases/tags/${version}"
+    local release_json
+    release_json=$(curl -fsSL "$api_url" 2>/dev/null || true)
+
+    # Prefer arch-specific assets when available, otherwise use the first AppImage.
+    local url=""
+    if [ "$arch" = "arm64" ]; then
+        url=$(echo "$release_json" | grep -Eo '"browser_download_url": "[^"]*\.AppImage[^"]*"' | grep -Ei 'arm64|aarch64' | head -n 1 | cut -d'"' -f4)
+    else
+        url=$(echo "$release_json" | grep -Eo '"browser_download_url": "[^"]*\.AppImage[^"]*"' | grep -Evi 'arm64|aarch64' | head -n 1 | cut -d'"' -f4)
+    fi
+
+    if [ -z "$url" ]; then
+        url=$(echo "$release_json" | grep -Eo '"browser_download_url": "[^"]*\.AppImage[^"]*"' | head -n 1 | cut -d'"' -f4)
+    fi
+
+    echo "$url"
+}
+
 download_appimage() {
     local version=$1
     local arch=$2
-    local url="https://github.com/${REPO}/releases/download/${version}/Codex.Linux-${version#v}.AppImage"
     local output="$BINARY_NAME.AppImage"
+    local url
+
+    url=$(get_appimage_url "$version" "$arch")
+    if [ -z "$url" ]; then
+        error "No AppImage asset found in release ${version}"
+        return 1
+    fi
 
     info "Downloading ${APP_NAME} ${version} (${arch})..."
 
