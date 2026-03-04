@@ -31,12 +31,11 @@ export class GitWorktreeManager {
         await git.deleteLocalBranch(branchName, true);
       }
 
-      // Create new branch from current HEAD
-      const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
-      await git.checkoutBranch(branchName, currentBranch);
-
-      // Add worktree
-      await git.raw(['worktree', 'add', worktreePath, branchName]);
+      // Create the branch directly in the new worktree from current HEAD commit.
+      // Avoid checking out the branch in the main worktree first, which makes
+      // `git worktree add <path> <branch>` fail because the branch is already checked out.
+      const headCommit = (await git.revparse(['HEAD'])).trim();
+      await git.raw(['worktree', 'add', '-b', branchName, worktreePath, headCommit]);
 
       log.info(`Created worktree ${name} at ${worktreePath}`);
 
