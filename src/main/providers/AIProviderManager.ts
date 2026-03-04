@@ -268,7 +268,7 @@ export class AIProviderManager extends EventEmitter {
         description: 'Free open-source models via OpenRouter, Groq, and more - No API key required for OpenRouter free tier',
         enabled: true,
         config: {
-          apiKey: '',
+          apiKey: this.settingsManager.getAny('free-models.apiKey') as string || process.env.OPENROUTER_API_KEY || '',
           baseUrl: 'https://openrouter.ai/api/v1',
           timeout: 60000,
           maxRetries: 3

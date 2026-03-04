@@ -923,6 +923,32 @@ export class FreeModelsProvider {
     return this.apiKeys[backend] || '';
   }
 
+  private getModelConfig(modelId: string): ProviderModel | undefined {
+    return FREE_MODELS.find(m => m.id === modelId);
+  }
+
+  private ensureBackendForModel(modelId: string): void {
+    const modelConfig = this.getModelConfig(modelId);
+    const targetBackend = modelConfig?.backend || this.activeBackend;
+    const backendCfg = FREE_MODEL_CONFIGS[targetBackend];
+
+    if (!backendCfg) {
+      throw new Error(`Unknown backend for model: ${modelId}`);
+    }
+
+    if (targetBackend !== this.activeBackend) {
+      this.setBackend(targetBackend, this.apiKeys[targetBackend]);
+    }
+
+    if (backendCfg.requiresApiKey) {
+      const key = this.apiKeys[targetBackend] || '';
+      if (!key.trim()) {
+        const providerName = backendCfg.provider;
+        throw new Error(`${providerName} API key required for model ${modelId}. Configure it in Settings > AI Providers > Free Models.`);
+      }
+    }
+  }
+
   private initializeClient(): void {
     const backendConfig = FREE_MODEL_CONFIGS[this.activeBackend];
     const baseUrl = this.config.baseUrl || backendConfig?.baseUrl || FREE_MODEL_CONFIGS.openrouter.baseUrl;
@@ -972,15 +998,10 @@ export class FreeModelsProvider {
       reasoningEffort?: 'low' | 'medium' | 'high';
     }
   ): Promise<{ content: string; metadata?: Record<string, any> }> {
+    this.ensureBackendForModel(model);
+
     if (!this.client) {
       throw new Error('Client not initialized');
-    }
-
-    if (this.activeBackend === 'openrouter') {
-      const openRouterKey = this.apiKeys.openrouter || this.config.apiKey || '';
-      if (!openRouterKey.trim()) {
-        throw new Error('OpenRouter API key required. Configure it in Settings > AI Providers > Free Models.');
-      }
     }
 
     const openaiMessages = messages.map(m => ({
@@ -1046,15 +1067,10 @@ export class FreeModelsProvider {
       onError?: (error: Error) => void;
     }
   ): Promise<{ content: string }> {
+    this.ensureBackendForModel(model);
+
     if (!this.client) {
       throw new Error('Client not initialized');
-    }
-
-    if (this.activeBackend === 'openrouter') {
-      const openRouterKey = this.apiKeys.openrouter || this.config.apiKey || '';
-      if (!openRouterKey.trim()) {
-        throw new Error('OpenRouter API key required. Configure it in Settings > AI Providers > Free Models.');
-      }
     }
 
     const openaiMessages = messages.map(m => ({
