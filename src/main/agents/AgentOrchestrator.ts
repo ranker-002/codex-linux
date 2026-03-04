@@ -41,6 +41,19 @@ export class AgentOrchestrator extends EventEmitter {
 
   private permissionManager: PermissionManager;
 
+  private normalizeProviderId(providerId: string): string {
+    return providerId === 'free' ? 'free-models' : providerId;
+  }
+
+  private async normalizeAgentProvider(agent: Agent): Promise<Agent> {
+    const normalizedProviderId = this.normalizeProviderId(agent.providerId);
+    if (normalizedProviderId !== agent.providerId) {
+      agent.providerId = normalizedProviderId;
+      await this.dbManager.updateAgent(agent);
+    }
+    return agent;
+  }
+
   constructor(
     private aiProviderManager: AIProviderManager,
     private gitWorktreeManager: GitWorktreeManager,
@@ -71,9 +84,10 @@ export class AgentOrchestrator extends EventEmitter {
       throw new Error(`Agent ${agentId} not found`);
     }
 
-    this.agents.set(agentId, fromDb);
-    this.lastActivity.set(agentId, fromDb.lastActiveAt || fromDb.updatedAt);
-    return fromDb;
+    const normalized = await this.normalizeAgentProvider(fromDb);
+    this.agents.set(agentId, normalized);
+    this.lastActivity.set(agentId, normalized.lastActiveAt || normalized.updatedAt);
+    return normalized;
   }
 
   private async cleanupInactiveAgents(): Promise<void> {
@@ -104,6 +118,7 @@ export class AgentOrchestrator extends EventEmitter {
     // Load existing agents from database
     const agents = await this.dbManager.getAllAgents();
     for (const agent of agents) {
+      await this.normalizeAgentProvider(agent);
       this.agents.set(agent.id, agent);
       this.lastActivity.set(agent.id, agent.lastActiveAt || agent.updatedAt);
       
@@ -316,7 +331,7 @@ export class AgentOrchestrator extends EventEmitter {
     this.emit('agent:message', { agentId, message: userMessage });
 
     try {
-      const providerId = agent.providerId === 'free' ? 'free-models' : agent.providerId;
+      const providerId = this.normalizeProviderId(agent.providerId);
       const provider = this.aiProviderManager.getProvider(providerId);
       if (!provider) {
         throw new Error(`Provider ${providerId} not found`);
@@ -422,7 +437,7 @@ export class AgentOrchestrator extends EventEmitter {
     },
     ephemeralSystemMessage?: AgentMessage
   ): Promise<{ content: string; metadata?: Record<string, any> }> {
-    const providerId = agent.providerId === 'free' ? 'free-models' : agent.providerId;
+    const providerId = this.normalizeProviderId(agent.providerId);
     const provider = this.aiProviderManager.getProvider(providerId);
     if (!provider) {
       throw new Error(`Provider ${providerId} not found`);

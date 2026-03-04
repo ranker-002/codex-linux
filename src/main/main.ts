@@ -684,6 +684,9 @@ function setupIPC(): void {
       if (typeof incomingConfig.name === 'string') {
         incomingConfig.name = incomingConfig.name.trim();
       }
+      if (incomingConfig.providerId === 'free') {
+        incomingConfig.providerId = 'free-models';
+      }
       const validatedConfig = AgentConfigSchema.parse(incomingConfig);
       const result = await agentOrchestrator.createAgent(validatedConfig as any);
       await auditLogger.log('agent_created', { agentId: result.id });
@@ -704,7 +707,11 @@ function setupIPC(): void {
 
   ipcMain.handle('agent:update', async (event, agentId: string, updates: any) => {
     try {
-      const result = await agentOrchestrator.updateAgent(agentId, updates);
+      const normalizedUpdates = typeof updates === 'object' && updates !== null ? { ...updates } : updates;
+      if (normalizedUpdates?.providerId === 'free') {
+        normalizedUpdates.providerId = 'free-models';
+      }
+      const result = await agentOrchestrator.updateAgent(agentId, normalizedUpdates);
       await auditLogger.log('agent_updated', { agentId });
       return result;
     } catch (error) {
