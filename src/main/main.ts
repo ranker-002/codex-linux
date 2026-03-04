@@ -16,6 +16,7 @@ import { spawn, ChildProcess } from 'child_process';
 import log from 'electron-log';
 import Store from 'electron-store';
 import { autoUpdater } from 'electron-updater';
+import simpleGit from 'simple-git';
 import { AgentOrchestrator } from './agents/AgentOrchestrator';
 import { GitWorktreeManager } from './git/GitWorktreeManager';
 import { SkillsManager } from './skills/SkillsManager';
@@ -73,6 +74,47 @@ let notificationManager: NotificationManager;
 let smartCodeAssistant: SmartCodeAssistant;
 
 log.info('Starting Codex Linux...');
+
+async function ensureChatWorkspaceRepo(): Promise<string> {
+  const workspacePath = path.join(app.getPath('userData'), 'chat-workspace');
+  await fs.mkdir(workspacePath, { recursive: true });
+
+  const git = simpleGit(workspacePath);
+  const isRepo = await git.checkIsRepo();
+
+  if (!isRepo) {
+    await git.init();
+    await fs.writeFile(
+      path.join(workspacePath, '.gitignore'),
+      '# Internal workspace used for chat-only agents\n',
+      'utf-8'
+    );
+    await git.add('.gitignore');
+    await git.raw([
+      '-c', 'user.name=Codex Linux',
+      '-c', 'user.email=codex-linux@local',
+      'commit',
+      '-m',
+      'Initialize chat workspace'
+    ]);
+    return workspacePath;
+  }
+
+  try {
+    await git.revparse(['HEAD']);
+  } catch {
+    await git.raw([
+      '-c', 'user.name=Codex Linux',
+      '-c', 'user.email=codex-linux@local',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'Initialize chat workspace'
+    ]);
+  }
+
+  return workspacePath;
+}
 
 function createWindow(): void {
   const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
@@ -635,7 +677,14 @@ function setupIPC(): void {
   // Agent operations with validation
   ipcMain.handle('agent:create', async (event, config) => {
     try {
-      const validatedConfig = AgentConfigSchema.parse(config);
+      const incomingConfig = typeof config === 'object' && config !== null ? { ...config } : {};
+      const rawProjectPath = typeof incomingConfig.projectPath === 'string' ? incomingConfig.projectPath.trim() : '';
+      const resolvedProjectPath = rawProjectPath.length > 0 ? rawProjectPath : await ensureChatWorkspaceRepo();
+      incomingConfig.projectPath = resolvedProjectPath;
+      if (typeof incomingConfig.name === 'string') {
+        incomingConfig.name = incomingConfig.name.trim();
+      }
+      const validatedConfig = AgentConfigSchema.parse(incomingConfig);
       const result = await agentOrchestrator.createAgent(validatedConfig as any);
       await auditLogger.log('agent_created', { agentId: result.id });
       return result;
